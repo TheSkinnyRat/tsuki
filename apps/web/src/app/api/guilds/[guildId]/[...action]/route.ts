@@ -1,0 +1,166 @@
+import { NextResponse } from "next/server";
+import { auth } from "@/auth.ts";
+import { bot, BotError } from "@/lib/bot.ts";
+
+/**
+ * The browser's door to the bot.
+ *
+ * Two things happen here and nowhere else: the signed-in member's Discord id
+ * is attached to the request, and anything the browser sent under `userId` is
+ * discarded. Without that second half the dashboard would be a way to act as
+ * somebody else — the bot trusts this proxy precisely because the proxy does
+ * not trust the page.
+ */
+
+const ALLOWED_POST = new Set([
+  "play",
+  "search",
+  "pause",
+  "resume",
+  "skip",
+  "stop",
+  "shuffle",
+  "clear",
+  "volume",
+  "seek",
+  "repeat",
+  "queue/remove",
+  "queue/move",
+  "filters/toggle",
+  "filters/eq",
+  "filters/timescale",
+  "filters/reset",
+  "nodes",
+  "playlists",
+]);
+
+function isAllowedPost(action: string): boolean {
+  if (ALLOWED_POST.has(action)) return true;
+  // Paths that carry a name: /nodes/<name>/enabled, /playlists/<name>/load
+  if (/^nodes\/[^/]+\/enabled$/.test(action)) return true;
+  if (/^playlists\/[^/]+\/load$/.test(action)) return true;
+  return false;
+}
+
+async function resolveActor(): Promise<string | null> {
+  const session = await auth();
+  const userId = (session?.user as { id?: string } | undefined)?.id;
+  return userId ?? null;
+}
+
+function fail(error: unknown): NextResponse {
+  if (error instanceof BotError) {
+    return NextResponse.json(
+      { error: { code: error.code, message: error.message, details: error.details } },
+      { status: error.status },
+    );
+  }
+  return NextResponse.json(
+    { error: { code: "INTERNAL", message: "Something went wrong." } },
+    { status: 500 },
+  );
+}
+
+type Params = { params: Promise<{ guildId: string; action: string[] }> };
+
+export async function GET(_request: Request, { params }: Params) {
+  const userId = await resolveActor();
+  if (!userId) {
+    return NextResponse.json({ error: { code: "UNAUTHENTICATED" } }, { status: 401 });
+  }
+  const { guildId, action } = await params;
+  const path = action.join("/");
+
+  try {
+    switch (path) {
+      case "player":
+        return NextResponse.json(await bot.player(guildId));
+      case "settings":
+        return NextResponse.json(await bot.settings(guildId));
+      case "nodes":
+        return NextResponse.json(await bot.nodes(guildId));
+      case "playlists":
+        return NextResponse.json(await bot.playlists(guildId));
+      default:
+        return NextResponse.json(
+          { error: { code: "NOT_FOUND", message: "No such view." } },
+          { status: 404 },
+        );
+    }
+  } catch (error) {
+    return fail(error);
+  }
+}
+
+export async function POST(request: Request, { params }: Params) {
+  const userId = await resolveActor();
+  if (!userId) {
+    return NextResponse.json({ error: { code: "UNAUTHENTICATED" } }, { status: 401 });
+  }
+  const { guildId, action } = await params;
+  const path = action.join("/");
+  if (!isAllowedPost(path)) {
+    return NextResponse.json(
+      { error: { code: "NOT_FOUND", message: "No such action." } },
+      { status: 404 },
+    );
+  }
+
+  const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
+  // Whatever the page claimed about who it is, the session decides.
+  delete body["userId"];
+
+  try {
+    return NextResponse.json(
+      await bot.action(guildId, path, { ...body, userId }),
+    );
+  } catch (error) {
+    return fail(error);
+  }
+}
+
+export async function PATCH(request: Request, { params }: Params) {
+  const userId = await resolveActor();
+  if (!userId) {
+    return NextResponse.json({ error: { code: "UNAUTHENTICATED" } }, { status: 401 });
+  }
+  const { guildId, action } = await params;
+  const path = action.join("/");
+  if (path !== "settings") {
+    return NextResponse.json(
+      { error: { code: "NOT_FOUND", message: "No such action." } },
+      { status: 404 },
+    );
+  }
+  const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
+  delete body["userId"];
+
+  try {
+    return NextResponse.json(
+      await bot.patch(guildId, "settings", { ...body, userId }),
+    );
+  } catch (error) {
+    return fail(error);
+  }
+}
+
+export async function DELETE(_request: Request, { params }: Params) {
+  const userId = await resolveActor();
+  if (!userId) {
+    return NextResponse.json({ error: { code: "UNAUTHENTICATED" } }, { status: 401 });
+  }
+  const { guildId, action } = await params;
+  const path = action.join("/");
+  if (!/^(nodes|playlists)\/[^/]+$/.test(path)) {
+    return NextResponse.json(
+      { error: { code: "NOT_FOUND", message: "No such action." } },
+      { status: 404 },
+    );
+  }
+
+  try {
+    return NextResponse.json(await bot.remove(guildId, path, { userId }));
+  } catch (error) {
+    return fail(error);
+  }
+}

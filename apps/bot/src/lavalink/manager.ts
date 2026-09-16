@@ -1,5 +1,5 @@
 import type { Client } from "discord.js";
-import { LavalinkManager, type LavalinkNode } from "lavalink-client";
+import { LavalinkManager, type LavalinkNode, type Player } from "lavalink-client";
 import { env } from "../env.ts";
 import { createLogger } from "../logger.ts";
 
@@ -46,7 +46,19 @@ export function nodesForGuild(
   return out;
 }
 
-export function createLavalinkManager(client: Client): LavalinkManager {
+export interface ManagerHooks {
+  /**
+   * Called when the queue runs dry, before `queueEnd`. Set after the manager
+   * exists because the handler needs the manager itself; adding a track here
+   * keeps the player alive.
+   */
+  autoPlay?: (player: Player) => Promise<void>;
+}
+
+export function createLavalinkManager(
+  client: Client,
+  hooks: ManagerHooks = {},
+): LavalinkManager {
   const manager = new LavalinkManager({
     nodes: env.defaultNode
       ? [
@@ -75,7 +87,14 @@ export function createLavalinkManager(client: Client): LavalinkManager {
     playerOptions: {
       defaultSearchPlatform: "ytsearch",
       onDisconnect: { autoReconnect: true, destroyPlayer: false },
-      onEmptyQueue: { destroyAfterMs: 30_000 },
+      // No `destroyAfterMs`: whether to leave an idle channel depends on the
+      // guild's stay247 setting, which a static timeout cannot express. See
+      // core/lifecycle.ts.
+      onEmptyQueue: {
+        autoPlayFunction: async (player) => {
+          await hooks.autoPlay?.(player);
+        },
+      },
       useUnresolvedData: true,
     },
     queueOptions: { maxPreviousTracks: 25 },

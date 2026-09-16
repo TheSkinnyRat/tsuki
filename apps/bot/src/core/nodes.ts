@@ -219,7 +219,41 @@ export async function listNodes(
     orderBy: [{ priority: "desc" }, { createdAt: "asc" }],
   });
 
-  return rows.map((row) => {
+  const summaries: NodeSummary[] = [];
+
+  // The instance's own node, when the operator offers one, is listed first so
+  // the panel never says "no node" while music is coming out of it.
+  if (env.defaultNode) {
+    const live = manager.nodeManager.nodes.get(DEFAULT_NODE_ID);
+    const info = live?.info;
+    summaries.push({
+      id: DEFAULT_NODE_ID,
+      instanceProvided: true,
+      name: "provided by this instance",
+      // Not the guild's machine, so not the guild's address to read.
+      host: "",
+      port: 0,
+      secure: env.defaultNode.secure,
+      enabled: true,
+      priority: -1,
+      connected: live?.connected ?? false,
+      health: live?.connected ? "ok" : "unknown",
+      lastError: null,
+      lastOkAt: null,
+      capabilities: info
+        ? {
+            version: info.version?.semver ?? "unknown",
+            sources: info.sourceManagers ?? [],
+            plugins: (info.plugins ?? []).map(
+              (plugin) => `${plugin.name}@${plugin.version}`,
+            ),
+            filters: info.filters ?? [],
+          }
+        : null,
+    });
+  }
+
+  summaries.push(...rows.map((row) => {
     const live = manager.nodeManager.nodes.get(nodeIdFor(guildId, row.name));
     const health: NodeHealth = live?.connected
       ? "ok"
@@ -242,7 +276,9 @@ export async function listNodes(
       lastOkAt: row.lastOkAt?.toISOString() ?? null,
       capabilities: capabilitiesFromRow(row),
     };
-  });
+  }));
+
+  return summaries;
 }
 
 /**

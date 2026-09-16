@@ -1,0 +1,74 @@
+@import "tailwindcss";
+
+/* Tsuki's palette, taken from the design Purwa supplied. Tokens rather than
+   literals so the dark scheme is one block, not a sweep through the markup. */
+@theme {
+  --color-bg: #fcfbf3;
+  --color-surface: #ffffff;
+  --color-ink: #101536;
+  --color-muted: #6b7086;
+  --color-line: #e7e5d8;
+  --color-accent: #474fb0;
+  --color-soft: #d1ccff;
+  --color-halo: #6b76d8;
+  --font-sans: Geist, "Helvetica Neue", Helvetica, ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+:root {
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --color-bg: #0d1020;
+    --color-surface: #161a2e;
+    --color-ink: #eceaf5;
+    --color-muted: #9a9fba;
+    --color-line: #262b44;
+    --color-accent: #8f97ea;
+    --color-soft: #2a2f55;
+    --color-halo: #a7adf2;
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --color-bg: #0d1020;
+  --color-surface: #161a2e;
+  --color-ink: #eceaf5;
+  --color-muted: #9a9fba;
+  --color-line: #262b44;
+  --color-accent: #8f97ea;
+  --color-soft: #2a2f55;
+  --color-halo: #a7adf2;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--color-soft);
+  color: var(--color-ink);
+}
+
+@keyframes tsuki-bar {
+  0%,
+  100% {
+    transform: scaleY(0.3);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}

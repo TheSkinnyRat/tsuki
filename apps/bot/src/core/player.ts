@@ -18,7 +18,25 @@ import {
   type PermissionContext,
 } from "./permissions.ts";
 import { assertNodeAvailable, sourcesForGuild } from "./nodes.ts";
+import {
+  applyEqPreset,
+  readFilterState,
+  resetFilters,
+  setPitch as applyPitch,
+  setSpeed as applySpeed,
+  toggleEffect,
+  type EffectName,
+  type EqPreset,
+  type FilterState,
+} from "./filters.ts";
+import {
+  deletePlaylist,
+  getPlaylistTracks,
+  savePlaylist,
+  type PlaylistSummary,
+} from "./playlists.ts";
 import { createLogger } from "../logger.ts";
+import { DisplayNames } from "./names.ts";
 
 const log = createLogger("player");
 
@@ -52,9 +70,10 @@ export function requiredSourceFor(query: string): string | null {
   }
 }
 
-function toTrackInfo(track: Track): TrackInfo {
+function toTrackInfo(track: Track, requestedByName: string | null = null): TrackInfo {
   const requester = track.requester as { id?: string } | undefined;
   return {
+    requestedByName,
     encoded: track.encoded ?? "",
     identifier: track.info.identifier,
     title: track.info.title,
@@ -77,10 +96,18 @@ export interface PlayerServiceDeps {
 export class PlayerService {
   private readonly manager: LavalinkManager;
   private readonly client: Client;
+  private readonly names: DisplayNames;
 
   constructor(deps: PlayerServiceDeps) {
     this.manager = deps.manager;
     this.client = deps.client;
+    this.names = new DisplayNames(deps.client);
+  }
+
+  /** Track plus the requester's display name, when it is already known. */
+  private describe(guildId: string, track: Track): TrackInfo {
+    const requester = track.requester as { id?: string } | undefined;
+    return toTrackInfo(track, this.names.peek(guildId, requester?.id ?? null));
   }
 
   getPlayer(guildId: string): Player | undefined {
@@ -175,7 +202,9 @@ export class PlayerService {
       };
     }
 
-    const queue = player.queue.tracks.map((t) => toTrackInfo(t as Track));
+    const queue = player.queue.tracks.map((t) =>
+      this.describe(guildId, t as Track),
+    );
     return {
       guildId,
       connected: Boolean(player.connected),
@@ -189,7 +218,7 @@ export class PlayerService {
       autoplay: settings.autoplay,
       nodeName: player.node.options.id ?? null,
       current: player.queue.current
-        ? toTrackInfo(player.queue.current as Track)
+        ? this.describe(guildId, player.queue.current as Track)
         : null,
       queue,
       queueLengthMs: queue.reduce(
@@ -303,7 +332,7 @@ export class PlayerService {
     if (startedPlaying) await player.play();
 
     return {
-      added: chosen.map(toTrackInfo),
+      added: chosen.map((track) => this.describe(actor.guildId, track)),
       playlistName: isPlaylist ? (result.playlist?.name ?? null) : null,
       startedPlaying,
       positionInQueue: options.playNext ? 0 : positionBefore,
@@ -461,6 +490,138 @@ export class PlayerService {
       });
     }
     if (!player.connected) await player.connect();
+  }
+
+  // ------------------------------------------------------------- filters
+
+  /** Reading filters needs no actor: it changes nothing. */
+  filterState(guildId: string): FilterState {
+    return readFilterState(this.requirePlayer(guildId));
+  }
+
+  async toggleFilter(actor: Actor, effect: EffectName): Promise<boolean> {
+    const player = this.requirePlayer(actor.guildId);
+    await this.authorise("control", actor);
+    return toggleEffect(player, effect);
+  }
+
+  async setEqualizer(actor: Actor, preset: EqPreset): Promise<void> {
+    const player = this.requirePlayer(actor.guildId);
+    await this.authorise("control", actor);
+    await applyEqPreset(player, preset);
+  }
+
+  async setSpeed(actor: Actor, speed: number): Promise<void> {
+    const player = this.requirePlayer(actor.guildId);
+    await this.authorise("control", actor);
+    await applySpeed(player, speed);
+  }
+
+  async setPitch(actor: Actor, pitch: number): Promise<void> {
+    const player = this.requirePlayer(actor.guildId);
+    await this.authorise("control", actor);
+    await applyPitch(player, pitch);
+  }
+
+  async clearFilters(actor: Actor): Promise<void> {
+    const player = this.requirePlayer(actor.guildId);
+    await this.authorise("control", actor);
+    await resetFilters(player);
+  }
+
+  // ----------------------------------------------------------- playlists
+
+  async savePlaylistFromQueue(
+    actor: Actor,
+    name: string,
+    description?: string,
+  ): Promise<PlaylistSummary> {
+    await this.authorise("request", actor);
+    const snapshot = await this.snapshot(actor.guildId);
+    const tracks = snapshot.current
+      ? [snapshot.current, ...snapshot.queue]
+      : snapshot.queue;
+    return savePlaylist(actor.guildId, actor.userId, name, tracks, description);
+  }
+
+  /**
+   * Queues a saved playlist. Tracks the guild's current node cannot decode are
+   * reported rather than silently dropped — a playlist saved while a Spotify
+   * capable node was configured is exactly the case that would otherwise load
+   * as a shorter queue with no explanation.
+   */
+  async loadPlaylist(
+    actor: Actor,
+    name: string,
+    options: { shuffle?: boolean; textChannelId?: string | null } = {},
+  ): Promise<{ queued: number; skipped: number; playlistName: string }> {
+    const context = await this.authorise("request", actor);
+    const nodeId = await assertNodeAvailable(this.manager, actor.guildId);
+    if (!actor.voiceChannelId) {
+      throw new ServiceError("NOT_IN_VOICE", "Join a voice channel first.");
+    }
+
+    const stored = await getPlaylistTracks(actor.guildId, name);
+    const node = this.manager.nodeManager.nodes.get(nodeId);
+    if (!node) {
+      throw new ServiceError("NO_NODE_AVAILABLE", "The audio node went away.");
+    }
+
+    const decoded: Track[] = [];
+    let skipped = 0;
+    for (const track of stored) {
+      try {
+        decoded.push(
+          (await node.decode.singleTrack(track.encoded, {
+            id: actor.userId,
+          })) as Track,
+        );
+      } catch {
+        skipped += 1;
+      }
+    }
+    if (decoded.length === 0) {
+      throw new ServiceError(
+        "SOURCE_UNSUPPORTED",
+        `This server's node could not read any of the ${stored.length} tracks in "${name}". It was probably saved while a different node was configured.`,
+      );
+    }
+
+    if (options.shuffle) {
+      for (let i = decoded.length - 1; i > 0; i -= 1) {
+        const j = Math.floor(Math.random() * (i + 1));
+        const a = decoded[i]!;
+        decoded[i] = decoded[j]!;
+        decoded[j] = a;
+      }
+    }
+
+    let player = this.getPlayer(actor.guildId);
+    if (!player) {
+      player = this.manager.createPlayer({
+        guildId: actor.guildId,
+        voiceChannelId: actor.voiceChannelId,
+        textChannelId: options.textChannelId ?? undefined,
+        selfDeaf: true,
+        volume: context.settings.defaultVolume,
+        node: nodeId,
+      });
+    }
+    if (!player.connected) await player.connect();
+
+    await player.queue.add(decoded);
+    if (!player.playing && !player.paused) await player.play();
+
+    return { queued: decoded.length, skipped, playlistName: name };
+  }
+
+  async removePlaylist(actor: Actor, name: string): Promise<void> {
+    const context = await this.buildContext(actor);
+    const canManage =
+      actor.isGuildManager ||
+      (context.settings.djRoleId !== null &&
+        actor.roleIds.includes(context.settings.djRoleId));
+    await deletePlaylist(actor.guildId, actor.userId, name, canManage);
   }
 
   /** Writes what just started to the guild's history, for autoplay and the dashboard. */

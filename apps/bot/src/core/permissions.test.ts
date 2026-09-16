@@ -231,3 +231,32 @@ test("the surface a request arrives on never changes the answer", () => {
   assert.doesNotThrow(() => assertCan("control", djDiscord));
   assert.doesNotThrow(() => assertCan("control", djWeb));
 });
+
+// ------------------------------------------ rescuing a player nobody can reach
+
+test("a guild manager can control playback from outside the channel", () => {
+  // Found by using it: a player stuck playing with no live voice connection
+  // could not be stopped by anyone, because every control path demanded being
+  // in a channel the bot was not really in.
+  const c = ctx({
+    actor: actor({ voiceChannelId: null, isGuildManager: true }),
+    player: {
+      connected: false,
+      voiceChannelId: VOICE,
+      currentRequesterId: null,
+      listenerCount: 0,
+    },
+  });
+  assert.doesNotThrow(() => assertCan("control", c));
+});
+
+test("a guild manager still cannot queue from outside a channel", () => {
+  // A request has to know which channel to play into.
+  const c = ctx({ actor: actor({ voiceChannelId: null, isGuildManager: true }) });
+  assert.equal(refusal(() => assertCan("request", c)).code, "NOT_IN_VOICE");
+});
+
+test("a plain member outside the channel is still refused control", () => {
+  const c = ctx({ actor: actor({ voiceChannelId: null }) });
+  assert.equal(refusal(() => assertCan("control", c)).code, "NOT_IN_VOICE");
+});

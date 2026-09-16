@@ -7,7 +7,12 @@ import {
 } from "discord.js";
 import { isServiceError } from "../core/errors.ts";
 import { createLogger } from "../logger.ts";
-import { commandsByName, handleModal, type CommandContext } from "./commands/index.ts";
+import {
+  commandsByName,
+  handleModal,
+  handleSearchSelect,
+  type CommandContext,
+} from "./commands/index.ts";
 import { errorEmbed } from "./embeds.ts";
 
 const log = createLogger("discord");
@@ -66,8 +71,17 @@ export function registerInteractionHandlers(
         await handleModal(interaction, context);
         return;
       }
+
+      if (interaction.isStringSelectMenu()) {
+        await handleSearchSelect(interaction, context);
+        return;
+      }
     } catch (error) {
-      if (interaction.isChatInputCommand() || interaction.isModalSubmit()) {
+      if (
+        interaction.isChatInputCommand() ||
+        interaction.isModalSubmit() ||
+        interaction.isStringSelectMenu()
+      ) {
         await reportFailure(interaction, error);
       }
     }

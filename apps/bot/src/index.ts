@@ -1,10 +1,11 @@
 import { Events, type Client } from "discord.js";
-import type { Track } from "lavalink-client";
+import type { Player } from "lavalink-client";
 import { env } from "./env.ts";
 import { createLogger } from "./logger.ts";
 import { createDiscordClient, registerInteractionHandlers } from "./discord/client.ts";
-import { createLavalinkManager } from "./lavalink/manager.ts";
+import { createLavalinkManager, type ManagerHooks } from "./lavalink/manager.ts";
 import { PlayerService } from "./core/player.ts";
+import { Lifecycle } from "./core/lifecycle.ts";
 import { syncGuildNodes } from "./core/nodes.ts";
 import { getGuildSettings } from "./core/guilds.ts";
 import { startApiServer } from "./http/server.ts";
@@ -13,8 +14,15 @@ const log = createLogger("boot");
 
 async function main(): Promise<void> {
   const client: Client = createDiscordClient();
-  const manager = createLavalinkManager(client);
+
+  // The autoplay hook needs the manager that is being built, so it is filled
+  // in once both exist rather than passed as a closure over undefined.
+  const hooks: ManagerHooks = {};
+  const manager = createLavalinkManager(client, hooks);
   const players = new PlayerService({ manager, client });
+  const lifecycle = new Lifecycle({ client, manager, players });
+  hooks.autoPlay = (player: Player) => lifecycle.autoPlayFunction(player);
+  lifecycle.register();
 
   registerInteractionHandlers(client, { players, manager });
 
@@ -27,11 +35,8 @@ async function main(): Promise<void> {
     log.info(`signed in as ${ready.user.tag}`);
     await manager.init({ id: ready.user.id, username: ready.user.username });
 
-    for (const guildId of ready.guilds.cache.keys()) {
-      await getGuildSettings(
-        guildId,
-        ready.guilds.cache.get(guildId)?.name ?? undefined,
-      );
+    for (const [guildId, guild] of ready.guilds.cache) {
+      await getGuildSettings(guildId, guild.name);
       await syncGuildNodes(manager, guildId).catch((error) =>
         log.warn(`could not sync nodes for ${guildId}`, error),
       );
@@ -39,19 +44,11 @@ async function main(): Promise<void> {
     log.info(`ready in ${ready.guilds.cache.size} guilds`);
   });
 
-  manager.on("trackStart", (player, track) => {
-    if (!track) return;
-    void players.recordPlayed(player.guildId, track as Track);
-  });
-
-  manager.on("playerDestroy", (player) => {
-    log.debug(`player destroyed in ${player.guildId}`);
-  });
-
   const api = startApiServer({ players, manager, client });
 
   const shutdown = async (signal: string) => {
     log.info(`${signal} — shutting down`);
+    lifecycle.dispose();
     api.close();
     await manager.nodeManager.disconnectAll(true, true).catch(() => undefined);
     await client.destroy();

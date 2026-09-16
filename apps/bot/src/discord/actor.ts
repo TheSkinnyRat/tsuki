@@ -2,6 +2,8 @@ import {
   PermissionsBitField,
   type ChatInputCommandInteraction,
   type GuildMember,
+  type MessageComponentInteraction,
+  type ModalSubmitInteraction,
 } from "discord.js";
 import type { Actor } from "@tsuki/shared";
 import { ServiceError } from "../core/errors.ts";
@@ -11,9 +13,12 @@ import { ServiceError } from "../core/errors.ts";
  * web session. Everything downstream sees one shape, which is what keeps a
  * permission rule from drifting between the two surfaces.
  */
-export function actorFromInteraction(
-  interaction: ChatInputCommandInteraction,
-): Actor {
+type GuildInteraction =
+  | ChatInputCommandInteraction
+  | MessageComponentInteraction
+  | ModalSubmitInteraction;
+
+export function actorFromInteraction(interaction: GuildInteraction): Actor {
   if (!interaction.inGuild() || !interaction.guildId) {
     throw new ServiceError(
       "INVALID_INPUT",

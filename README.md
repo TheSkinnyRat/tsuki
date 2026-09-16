@@ -41,10 +41,38 @@ that node yourself.
 pnpm install
 cp .env.example .env        # then fill DISCORD_TOKEN and the secrets
 pnpm db:push
-pnpm dev:bot
+pnpm dev:bot                # the Discord bot
+pnpm dev:web                # the dashboard, on http://127.0.0.1:3860
 ```
 
-### Two rules that are easy to break
+Register the slash commands once, in a test guild so they appear immediately:
+
+```bash
+pnpm --filter @tsuki/bot run deploy-commands <guild id>
+```
+
+### Opening the dashboard without an OAuth application
+
+Setting up Discord OAuth just to look at a queue is a lot of ceremony. Set
+`DEV_LOGIN=1` and the sign-in page gains a field that takes a Discord user id
+directly. It grants nothing the real login would not — the bot still decides
+every permission from that id — and it cannot exist in a deployed build,
+because `next build` sets `NODE_ENV=production` and the provider is only
+registered when that is not the case.
+
+### Proving audio actually arrives
+
+`tools/audio-probe` joins a voice channel as a second bot and counts the Opus
+packets the music bot transmits. Discord's silence frame is three bytes, so
+anything larger is real sound — which answers "is there audio in the room"
+without an Opus decoder, and without trusting Lavalink's own word for it.
+
+```bash
+cd tools/audio-probe
+node --env-file=../../.env src/index.ts <guild id> <voice channel id> 30
+```
+
+### Three rules that are easy to break
 
 **The database schema stays in the subset SQLite and PostgreSQL share.** No
 `enum`, no scalar lists, no `Json`. That is what keeps `provider` a one-line
@@ -54,6 +82,12 @@ change; the migration history still has to be regenerated when you switch.
 directly on Node, which strips types rather than compiling them — so no `enum`,
 no `namespace`, and no constructor parameter properties. Relative imports carry
 their `.ts` extension.
+
+**A permission is decided in `apps/bot/src/core/permissions.ts` and nowhere
+else.** Both the slash commands and the dashboard's API call it, and the rule
+never reads which surface the request came from. Enforcing something in a
+command handler instead means enforcing it on Discord and leaving it open on
+the web.
 
 ## Licence
 

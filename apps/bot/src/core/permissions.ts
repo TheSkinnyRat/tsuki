@@ -66,7 +66,15 @@ function sharesVoice(ctx: PermissionContext): boolean {
   return actor.voiceChannelId === player.voiceChannelId;
 }
 
-/** Throws unless the actor is in the voice channel the player is using. */
+/**
+ * Throws unless the actor is in the voice channel the player is using.
+ *
+ * A guild manager is exempt when stopping or changing playback. Without that
+ * exemption a player left in a bad state — playing with no live voice
+ * connection, nobody in the channel — cannot be stopped by anyone from
+ * Discord, because every control path asks to be in a channel the bot is not
+ * really in. Queueing still requires voice: a request has to know where to go.
+ */
 export function assertInVoice(ctx: PermissionContext): void {
   const { actor, player } = ctx;
   if (actor.voiceChannelId === null) {
@@ -99,7 +107,7 @@ export function assertCan(capability: Capability, ctx: PermissionContext): void 
     );
   }
 
-  assertInVoice(ctx);
+  if (capability === "request" || !actor.isGuildManager) assertInVoice(ctx);
 
   if (rule?.locked && !isDj(ctx)) {
     throw new ServiceError(

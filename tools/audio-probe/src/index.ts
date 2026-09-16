@@ -80,9 +80,18 @@ async function main(): Promise<void> {
       selfDeaf: false,
       selfMute: true,
     });
-    await entersState(connection, VoiceConnectionStatus.Ready, 20_000);
+    connection.on("stateChange", (from, to) =>
+      console.log(
+        JSON.stringify({ event: "voice-state", from: from.status, to: to.status }),
+      ),
+    );
+    connection.on("error", (error) =>
+      console.error(JSON.stringify({ event: "voice-error", error: String(error) })),
+    );
+    await entersState(connection, VoiceConnectionStatus.Ready, 30_000);
   } catch (error) {
     console.error("could not join the voice channel:", error);
+    console.error("last voice state:", connection!?.state?.status);
     await client.destroy();
     process.exit(1);
   }

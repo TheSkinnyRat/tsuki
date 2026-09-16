@@ -22,6 +22,8 @@ export interface TrackInfo {
   sourceName: string | null;
   /** Discord user id, or null when autoplay chose it. */
   requestedBy: string | null;
+  /** That member's display name, resolved by the bot. Null until it is known. */
+  requestedByName: string | null;
 }
 
 // ------------------------------------------------------------------- player
@@ -66,6 +68,11 @@ export type NodeHealth = "unknown" | "ok" | "unreachable" | "rejected";
 
 export interface NodeSummary {
   id: string;
+  /**
+   * True for a node the instance operator supplies rather than the guild.
+   * The dashboard shows it, but nobody in the guild can edit or remove it.
+   */
+  instanceProvided?: boolean;
   name: string;
   host: string;
   port: number;

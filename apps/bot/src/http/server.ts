@@ -1,7 +1,7 @@
 import { serve, type ServerType } from "@hono/node-server";
 import { Hono } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
-import type { Client } from "discord.js";
+import { PermissionsBitField, type Client } from "discord.js";
 import type { LavalinkManager } from "lavalink-client";
 import { safeEqual, type RepeatMode } from "@tsuki/shared";
 import { z } from "zod";
@@ -17,6 +17,8 @@ import {
 } from "../core/guilds.ts";
 import { assertCan } from "../core/permissions.ts";
 import { addNode, listNodes, removeNode, setNodeEnabled } from "../core/nodes.ts";
+import { EFFECTS, EQ_PRESETS, type EffectName, type EqPreset } from "../core/filters.ts";
+import { listPlaylists } from "../core/playlists.ts";
 import { actorFromWeb } from "./actor.ts";
 
 const log = createLogger("api");
@@ -60,6 +62,38 @@ export function createApi(deps: ApiDeps): Hono {
     }
     log.error("unhandled api error", error);
     return c.json({ error: { code: "INTERNAL", message: "Internal error." } }, 500);
+  });
+
+  /**
+   * Servers this member and Tsuki are both in.
+   *
+   * Asked of the bot rather than of Discord's OAuth guild list, because that
+   * list includes every server the member is in — most of which do not have
+   * Tsuki — and says nothing about whether the bot is there. This answers the
+   * question the picker actually has.
+   */
+  app.get("/api/members/:userId/guilds", async (c) => {
+    const userId = c.req.param("userId");
+    const out: Array<{
+      id: string;
+      name: string;
+      icon: string | null;
+      canManage: boolean;
+    }> = [];
+
+    for (const [guildId, guild] of deps.client.guilds.cache) {
+      const member = await guild.members.fetch(userId).catch(() => null);
+      if (!member) continue;
+      out.push({
+        id: guildId,
+        name: guild.name,
+        icon: guild.icon,
+        canManage: member.permissions.has(
+          PermissionsBitField.Flags.ManageGuild,
+        ),
+      });
+    }
+    return c.json(out);
   });
 
   const guild = app.basePath("/api/guilds/:guildId");
@@ -225,6 +259,110 @@ export function createApi(deps: ApiDeps): Hono {
       body.userId,
     );
     return c.json({ moved: await deps.players.move(actor, body.from, body.to) });
+  });
+
+  // ------------------------------------------------------------- filters
+
+  guild.get("/filters", (c) =>
+    c.json(deps.players.filterState(c.req.param("guildId")!)),
+  );
+
+  guild.post("/filters/toggle", async (c) => {
+    const body = actorBody
+      .extend({
+        effect: z.enum(Object.keys(EFFECTS) as [EffectName, ...EffectName[]]),
+      })
+      .parse(await c.req.json());
+    const actor = await actorFromWeb(
+      deps.client,
+      c.req.param("guildId")!,
+      body.userId,
+    );
+    return c.json({ on: await deps.players.toggleFilter(actor, body.effect) });
+  });
+
+  guild.post("/filters/eq", async (c) => {
+    const body = actorBody
+      .extend({ preset: z.enum(EQ_PRESETS as unknown as [EqPreset, ...EqPreset[]]) })
+      .parse(await c.req.json());
+    const actor = await actorFromWeb(
+      deps.client,
+      c.req.param("guildId")!,
+      body.userId,
+    );
+    await deps.players.setEqualizer(actor, body.preset);
+    return c.json({ ok: true });
+  });
+
+  guild.post("/filters/timescale", async (c) => {
+    const body = actorBody
+      .extend({
+        speed: z.number().min(0.25).max(3).optional(),
+        pitch: z.number().min(0.25).max(3).optional(),
+      })
+      .parse(await c.req.json());
+    const actor = await actorFromWeb(
+      deps.client,
+      c.req.param("guildId")!,
+      body.userId,
+    );
+    if (body.speed !== undefined) await deps.players.setSpeed(actor, body.speed);
+    if (body.pitch !== undefined) await deps.players.setPitch(actor, body.pitch);
+    return c.json({ ok: true });
+  });
+
+  guild.post("/filters/reset", async (c) => {
+    await deps.players.clearFilters(await actorOf(c));
+    return c.json({ ok: true });
+  });
+
+  // ----------------------------------------------------------- playlists
+
+  guild.get("/playlists", async (c) =>
+    c.json(await listPlaylists(c.req.param("guildId")!)),
+  );
+
+  guild.post("/playlists", async (c) => {
+    const body = actorBody
+      .extend({
+        name: z.string().min(1),
+        description: z.string().optional(),
+      })
+      .parse(await c.req.json());
+    const actor = await actorFromWeb(
+      deps.client,
+      c.req.param("guildId")!,
+      body.userId,
+    );
+    return c.json(
+      await deps.players.savePlaylistFromQueue(
+        actor,
+        body.name,
+        body.description,
+      ),
+    );
+  });
+
+  guild.post("/playlists/:name/load", async (c) => {
+    const body = actorBody
+      .extend({ shuffle: z.boolean().optional() })
+      .parse(await c.req.json());
+    const actor = await actorFromWeb(
+      deps.client,
+      c.req.param("guildId")!,
+      body.userId,
+    );
+    return c.json(
+      await deps.players.loadPlaylist(actor, c.req.param("name")!, {
+        shuffle: body.shuffle ?? false,
+      }),
+    );
+  });
+
+  guild.delete("/playlists/:name", async (c) => {
+    const actor = await actorOf(c);
+    await deps.players.removePlaylist(actor, c.req.param("name")!);
+    return c.json({ ok: true });
   });
 
   // ---------------------------------------------------------- management

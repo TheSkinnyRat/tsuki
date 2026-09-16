@@ -93,7 +93,7 @@ export const filterCommand: Command = {
           noticeEmbed(
             [
               on.length > 0 ? `On: **${on.join(", ")}**` : "No effects are on.",
-              `speed ${state.speed} · pitch ${state.pitch} · output ${state.audioOutput}`,
+              `speed ${state.speed.toFixed(2)}× · pitch ${state.pitch.toFixed(2)}× · output ${state.audioOutput}`,
               state.equalizerApplied ? "An equaliser preset is applied." : "",
               state.availableOnNode.length > 0
                 ? `This node offers: ${state.availableOnNode.join(", ")}`

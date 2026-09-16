@@ -61,7 +61,7 @@ export const searchCommand: Command = {
     await interaction.editReply({
       embeds: [
         noticeEmbed(
-          `**${tracks.length}** results for "${query}". Pick up to five.`,
+          `**${tracks.length}** results for "${query.replace(/^[a-z]+search:/i, "")}". Pick up to five.`,
         ),
       ],
       components: [
@@ -115,18 +115,29 @@ export async function handleSearchSelect(
   }
 
   let queued = 0;
+  let first: Awaited<ReturnType<typeof context.players.enqueue>> | null = null;
   for (const track of picked) {
     if (!track.uri) continue;
-    await context.players.enqueue(actor, track.uri, {
+    const result = await context.players.enqueue(actor, track.uri, {
       textChannelId: interaction.channelId,
     });
+    first ??= result;
     queued += 1;
   }
 
+  // The menu is spent once a pick lands; leaving it live invites a second
+  // pick against results that are no longer on screen.
+  await interaction.message.edit({ components: [] }).catch(() => undefined);
+
   await interaction.editReply({
     embeds: [
-      queued === 1 && picked[0]
-        ? addedEmbed([picked[0]], null, 1)
+      queued === 1 && first
+        ? addedEmbed(
+            first.added,
+            null,
+            first.positionInQueue,
+            first.startedPlaying ? "now" : "queued",
+          )
         : noticeEmbed(`Queued ${queued} tracks.`),
     ],
   });

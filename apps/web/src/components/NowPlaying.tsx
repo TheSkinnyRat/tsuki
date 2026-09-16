@@ -127,7 +127,7 @@ export function NowPlaying({
             detail={
               settings?.djRoleId
                 ? "Others can still skip the tracks they asked for"
-                : "No DJ role set yet — pick one with /settings dj in Discord"
+                : "No DJ role set yet — pick one under Settings"
             }
           />
           <Switch

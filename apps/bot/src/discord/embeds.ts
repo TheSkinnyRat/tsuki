@@ -5,7 +5,7 @@ import type {
   TrackInfo,
 } from "@tsuki/shared";
 
-/** Tsuki's indigo, the same accent the dashboard uses. */
+/** The design's halo indigo, the same the dashboard uses for labels. */
 export const ACCENT = 0x474fb0;
 export const WARN = 0xb08a47;
 export const BAD = 0xb04a4a;
@@ -23,9 +23,18 @@ export function formatDuration(ms: number): string {
 function trackLine(track: TrackInfo): string {
   const length = track.isStream ? "live" : formatDuration(track.lengthMs);
   const title = track.uri
-    ? `[${escapeMarkdown(track.title)}](${track.uri})`
+    ? `[${linkText(track.title)}](${track.uri})`
     : escapeMarkdown(track.title);
   return `${title} · ${escapeMarkdown(track.author)} · \`${length}\``;
+}
+
+/**
+ * Text inside a markdown link. Discord does not unescape backslashes there, so
+ * the escaping that is right for plain text shows up as literal "\[2018\]".
+ * Only the brackets can break a link, so only they are swapped out.
+ */
+function linkText(text: string): string {
+  return text.replace(/\[/g, "(").replace(/\]/g, ")");
 }
 
 function escapeMarkdown(text: string): string {
@@ -40,10 +49,13 @@ export function noticeEmbed(message: string): EmbedBuilder {
   return new EmbedBuilder().setColor(ACCENT).setDescription(message);
 }
 
+export type AddedAs = "now" | "next" | "queued";
+
 export function addedEmbed(
   tracks: TrackInfo[],
   playlistName: string | null,
   position: number,
+  addedAs: AddedAs = "queued",
 ): EmbedBuilder {
   const first = tracks[0];
   if (playlistName && tracks.length > 1) {
@@ -60,7 +72,14 @@ export function addedEmbed(
   if (!first) return noticeEmbed("Nothing was added.");
   return new EmbedBuilder()
     .setColor(ACCENT)
-    .setAuthor({ name: position === 0 ? "Playing next" : "Added to the queue" })
+    .setAuthor({
+      name:
+        addedAs === "now"
+          ? "Now playing"
+          : addedAs === "next"
+            ? "Playing next"
+            : `Added to the queue · #${position + 1}`,
+    })
     .setDescription(trackLine(first))
     .setThumbnail(first.artworkUrl);
 }
@@ -91,10 +110,15 @@ export function nowPlayingEmbed(snapshot: PlayerSnapshot): EmbedBuilder {
 
   if (current.uri) embed.setURL(current.uri);
 
+  // Mentions do not render in a footer, so who asked goes in the body.
+  embed.addFields({
+    name: "Asked by",
+    value: current.requestedBy ? `<@${current.requestedBy}>` : "autoplay",
+    inline: true,
+  });
   const footer: string[] = [`volume ${snapshot.volume}`];
   if (snapshot.repeatMode !== "off") footer.push(`repeat ${snapshot.repeatMode}`);
-  if (snapshot.autoplay) footer.push("autoplay");
-  if (current.requestedBy) footer.push(`asked by <@${current.requestedBy}>`);
+  if (snapshot.autoplay) footer.push("autoplay on");
   embed.setFooter({ text: footer.join(" · ") });
 
   return embed;
@@ -118,16 +142,12 @@ export function queueEmbed(
   perPage = QUEUE_PAGE_SIZE,
 ): EmbedBuilder {
   const embed = new EmbedBuilder().setColor(ACCENT).setTitle("Queue");
-
-  if (snapshot.current) {
-    embed.addFields({
-      name: "Now playing",
-      value: trackLine(snapshot.current),
-    });
-  }
+  const head = snapshot.current
+    ? `**Now playing** ${trackLine(snapshot.current)}\n\n`
+    : "";
 
   if (snapshot.queue.length === 0) {
-    embed.setDescription("Nothing queued after this.");
+    embed.setDescription(`${head}Nothing queued after this.`);
     return embed;
   }
 
@@ -138,7 +158,7 @@ export function queueEmbed(
     .slice(start, start + perPage)
     .map((track, index) => `\`${String(start + index + 1).padStart(2, "0")}\` ${trackLine(track)}`);
 
-  embed.setDescription(lines.join("\n")).setFooter({
+  embed.setDescription(head + lines.join("\n")).setFooter({
     text: `page ${safePage}/${pages} · ${snapshot.queue.length} tracks · ${formatDuration(snapshot.queueLengthMs)} left`,
   });
   return embed;

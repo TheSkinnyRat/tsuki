@@ -9,6 +9,24 @@ import { forgetUnplayable } from "./history.ts";
 
 const log = createLogger("lifecycle");
 
+/**
+ * One readable line out of a node's exception. Lavalink forwards whole Java
+ * stack traces, and posting one into a channel — as happened when YouTube
+ * refused this server's address — tells a member nothing and fills the screen.
+ */
+export function reasonFor(message: string | null | undefined): string {
+  if (!message) return "the node refused it";
+  const lines = message
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith("at "));
+  const failed = lines.find((line) => /failed:/i.test(line));
+  const chosen = (failed ?? lines[0] ?? "the node refused it")
+    .replace(/^Client \[[^\]]+\] failed:\s*/i, "")
+    .replace(/^\(yts\.version[^)]*\)\s*/i, "");
+  return chosen.length > 140 ? `${chosen.slice(0, 137)}…` : chosen;
+}
+
 export type IdleReason = "queue-ran-out" | "channel-empty";
 
 export const IDLE_REASONS: Record<IdleReason, string> = {
@@ -94,9 +112,9 @@ export class Lifecycle {
       });
       void this.say(
         player,
-        `Could not play **${track?.info.title ?? "that track"}** — ${
-          payload.exception?.message ?? "the node refused it"
-        }. Skipping.`,
+        `Could not play **${track?.info.title ?? "that track"}** — ${reasonFor(
+          payload.exception?.message,
+        )}. Skipping.`,
       );
     });
 
@@ -143,7 +161,7 @@ export class Lifecycle {
     await this.say(
       player,
       settings.autoplay
-        ? "The queue is empty and there is nothing in this server's history to keep going with."
+        ? "That was the last track, and autoplay found nothing in this server's history the node could play."
         : "That was the last track.",
     );
     if (settings.stay247) return;

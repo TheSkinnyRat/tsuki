@@ -68,7 +68,16 @@ export const playCommand: Command = {
     );
     await interaction.editReply({
       embeds: [
-        addedEmbed(result.added, result.playlistName, result.positionInQueue),
+        addedEmbed(
+          result.added,
+          result.playlistName,
+          result.positionInQueue,
+          result.startedPlaying
+            ? "now"
+            : interaction.options.getBoolean("next")
+              ? "next"
+              : "queued",
+        ),
       ],
     });
   },

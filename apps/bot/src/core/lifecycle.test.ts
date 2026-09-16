@@ -70,3 +70,20 @@ test("an empty room with nothing playing is still left", () => {
     true,
   );
 });
+
+import { reasonFor } from "./lifecycle.ts";
+
+test("a Java stack trace becomes one readable reason", () => {
+  const trace = [
+    "(yts.version: 1.18.2) All clients failed to load the item.",
+    "Client [ANDROID_VR] failed: This video requires login.",
+    "        at dev.lavalink.youtube.clients.skeleton.Client.getPlayabilityStatus(Client.java:94)",
+    "Client [WEB] failed: This video requires login.",
+  ].join("\n");
+  assert.equal(reasonFor(trace), "This video requires login.");
+});
+
+test("a missing or huge message still yields something short", () => {
+  assert.equal(reasonFor(undefined), "the node refused it");
+  assert.ok(reasonFor("x".repeat(500)).length <= 140);
+});

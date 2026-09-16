@@ -74,6 +74,9 @@ export const bot = {
   nodes: (guildId: string) =>
     call<NodeSummary[]>(`/api/guilds/${guildId}/nodes`),
 
+  filters: (guildId: string) =>
+    call<Record<string, unknown>>(`/api/guilds/${guildId}/filters`),
+
   playlists: (guildId: string) =>
     call<Array<{ name: string; trackCount: number; totalLengthMs: number; createdBy: string }>>(
       `/api/guilds/${guildId}/playlists`,

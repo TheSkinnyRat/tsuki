@@ -49,6 +49,15 @@ export const api = {
   settings: (guildId: string) =>
     request<{ settings: GuildSettings }>(guildId, "settings"),
   nodes: (guildId: string) => request<NodeSummary[]>(guildId, "nodes"),
+  filters: (guildId: string) =>
+    request<{
+      effects: Record<string, boolean | undefined>;
+      speed: number;
+      pitch: number;
+      audioOutput: string;
+      equalizerApplied: boolean;
+      availableOnNode: string[];
+    }>(guildId, "filters"),
   playlists: (guildId: string) =>
     request<
       Array<{

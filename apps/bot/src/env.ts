@@ -25,38 +25,79 @@ function int(name: string, fallback: number): number {
   return parsed;
 }
 
-const defaultNodeHost = optional("DEFAULT_NODE_HOST");
-const defaultNodePassword = optional("DEFAULT_NODE_PASSWORD");
+function once<T>(read: () => T): () => T {
+  let value: T;
+  let done = false;
+  return () => {
+    if (!done) {
+      value = read();
+      done = true;
+    }
+    return value;
+  };
+}
 
+const encryptionKey = once(() => loadSecretKey(required("ENCRYPTION_KEY")));
+
+/**
+ * Read on use, not on import.
+ *
+ * Importing a module must not demand a secret: the parity test builds the HTTP
+ * app to read its route table, and a tool that only wants the command list
+ * should not need a Discord token to load one. Reading eagerly turned both of
+ * those into "DISCORD_TOKEN is required" from a file that never touches it.
+ */
 export const env = {
-  discordToken: required("DISCORD_TOKEN"),
-  discordClientId: required("DISCORD_CLIENT_ID"),
-
-  encryptionKey: loadSecretKey(required("ENCRYPTION_KEY")),
-
-  apiToken: required("BOT_API_TOKEN"),
-  apiPort: int("BOT_API_PORT", 3856),
-  apiHost: process.env["BOT_API_HOST"] ?? "127.0.0.1",
-
-  allowPrivateNodeHosts: bool("ALLOW_PRIVATE_NODE_HOSTS", false),
+  get discordToken(): string {
+    return required("DISCORD_TOKEN");
+  },
+  get discordClientId(): string {
+    return required("DISCORD_CLIENT_ID");
+  },
+  get encryptionKey(): Buffer {
+    return encryptionKey();
+  },
+  get apiToken(): string {
+    return required("BOT_API_TOKEN");
+  },
+  get apiPort(): number {
+    return int("BOT_API_PORT", 3856);
+  },
+  get apiHost(): string {
+    return process.env["BOT_API_HOST"] ?? "127.0.0.1";
+  },
+  get allowPrivateNodeHosts(): boolean {
+    return bool("ALLOW_PRIVATE_NODE_HOSTS", false);
+  },
 
   /**
    * A node the instance offers to guilds that have configured none. The public
    * instance leaves this empty on purpose — bringing your own node is the
    * point — but a self-hoster almost always wants one.
    */
-  defaultNode:
-    defaultNodeHost && defaultNodePassword
-      ? {
-          host: defaultNodeHost,
-          port: int("DEFAULT_NODE_PORT", 2333),
-          password: defaultNodePassword,
-          secure: bool("DEFAULT_NODE_SECURE", false),
-        }
-      : null,
+  get defaultNode(): {
+    host: string;
+    port: number;
+    password: string;
+    secure: boolean;
+  } | null {
+    const host = optional("DEFAULT_NODE_HOST");
+    const password = optional("DEFAULT_NODE_PASSWORD");
+    if (!host || !password) return null;
+    return {
+      host,
+      port: int("DEFAULT_NODE_PORT", 2333),
+      password,
+      secure: bool("DEFAULT_NODE_SECURE", false),
+    };
+  },
 
-  nodeEnv: process.env["NODE_ENV"] ?? "development",
-  logLevel: process.env["LOG_LEVEL"] ?? "info",
-} as const;
+  get nodeEnv(): string {
+    return process.env["NODE_ENV"] ?? "development";
+  },
+  get logLevel(): string {
+    return process.env["LOG_LEVEL"] ?? "info";
+  },
+};
 
 export type Env = typeof env;

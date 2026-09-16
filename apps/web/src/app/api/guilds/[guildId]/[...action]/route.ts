@@ -81,6 +81,8 @@ export async function GET(_request: Request, { params }: Params) {
         return NextResponse.json(await bot.nodes(guildId));
       case "playlists":
         return NextResponse.json(await bot.playlists(guildId));
+      case "filters":
+        return NextResponse.json(await bot.filters(guildId));
       default:
         return NextResponse.json(
           { error: { code: "NOT_FOUND", message: "No such view." } },

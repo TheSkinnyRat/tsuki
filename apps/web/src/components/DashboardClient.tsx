@@ -8,6 +8,8 @@ import { QueuePanel } from "./QueuePanel.tsx";
 import { NodesPanel } from "./NodesPanel.tsx";
 import { SettingsPanel } from "./SettingsPanel.tsx";
 import { PlayerBar } from "./PlayerBar.tsx";
+import { EffectsPanel } from "./EffectsPanel.tsx";
+import { PlaylistsPanel } from "./PlaylistsPanel.tsx";
 
 /**
  * Polls rather than streams, on purpose for now.
@@ -27,7 +29,7 @@ const POLL_MS = 2000;
  */
 const NOW_GRID = "grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]";
 
-type Tab = "now" | "nodes" | "settings";
+type Tab = "now" | "playlists" | "effects" | "nodes" | "settings";
 
 export function DashboardClient({
   guildId,
@@ -120,10 +122,12 @@ export function DashboardClient({
                 : "idle"}
           </span>
         </div>
-        <nav className="mx-auto flex max-w-6xl gap-1 px-4 pb-2">
+        <nav className="mx-auto flex max-w-6xl gap-1 overflow-x-auto px-4 pb-2">
           {(
             [
               ["now", "Now playing"],
+              ["playlists", "Playlists"],
+              ["effects", "Effects"],
               ["nodes", "Audio nodes"],
               ["settings", "Settings"],
             ] as Array<[Tab, string]>
@@ -167,6 +171,14 @@ export function DashboardClient({
               nodes={nodes}
             />
           </div>
+        ) : null}
+
+        {tab === "playlists" ? (
+          <PlaylistsPanel guildId={guildId} onAct={act} />
+        ) : null}
+
+        {tab === "effects" ? (
+          <EffectsPanel guildId={guildId} player={player} onAct={act} />
         ) : null}
 
         {tab === "nodes" ? (

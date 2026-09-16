@@ -1,0 +1,329 @@
+import { serve, type ServerType } from "@hono/node-server";
+import { Hono } from "hono";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
+import type { Client } from "discord.js";
+import type { LavalinkManager } from "lavalink-client";
+import { safeEqual, type RepeatMode } from "@tsuki/shared";
+import { z } from "zod";
+import { env } from "../env.ts";
+import { createLogger } from "../logger.ts";
+import { isServiceError, ServiceError, statusForCode } from "../core/errors.ts";
+import type { PlayerService } from "../core/player.ts";
+import {
+  getGuildSettings,
+  listChannelRules,
+  setChannelRule,
+  updateGuildSettings,
+} from "../core/guilds.ts";
+import { assertCan } from "../core/permissions.ts";
+import { addNode, listNodes, removeNode, setNodeEnabled } from "../core/nodes.ts";
+import { actorFromWeb } from "./actor.ts";
+
+const log = createLogger("api");
+
+export interface ApiDeps {
+  players: PlayerService;
+  manager: LavalinkManager;
+  client: Client;
+}
+
+const actorBody = z.object({ userId: z.string().min(1) });
+
+export function createApi(deps: ApiDeps): Hono {
+  const app = new Hono();
+
+  app.get("/health", (c) => c.json({ ok: true }));
+
+  // Everything below is the dashboard's door, and it is not on the internet:
+  // the server binds loopback and the shared token is checked in constant time.
+  app.use("/api/*", async (c, next) => {
+    const header = c.req.header("authorization") ?? "";
+    const token = header.startsWith("Bearer ") ? header.slice(7) : "";
+    if (!token || !safeEqual(token, env.apiToken)) {
+      return c.json({ error: { code: "UNAUTHORISED" } }, 401);
+    }
+    await next();
+  });
+
+  app.onError((error, c) => {
+    if (isServiceError(error)) {
+      return c.json(
+        { error: error.toJSON() },
+        statusForCode(error.code) as ContentfulStatusCode,
+      );
+    }
+    if (error instanceof z.ZodError) {
+      return c.json(
+        { error: { code: "INVALID_INPUT", message: "Malformed request." } },
+        400,
+      );
+    }
+    log.error("unhandled api error", error);
+    return c.json({ error: { code: "INTERNAL", message: "Internal error." } }, 500);
+  });
+
+  const guild = app.basePath("/api/guilds/:guildId");
+
+  async function actorOf(c: {
+    req: { param: (k: string) => string | undefined; json: () => Promise<unknown> };
+  }) {
+    const guildId = c.req.param("guildId");
+    if (!guildId) throw new ServiceError("INVALID_INPUT", "Missing guild.");
+    const body = actorBody.parse(await c.req.json());
+    return actorFromWeb(deps.client, guildId, body.userId);
+  }
+
+  // ------------------------------------------------------------- reading
+
+  guild.get("/player", async (c) => {
+    const guildId = c.req.param("guildId")!;
+    return c.json(await deps.players.snapshot(guildId));
+  });
+
+  guild.get("/settings", async (c) => {
+    const guildId = c.req.param("guildId")!;
+    return c.json({
+      settings: await getGuildSettings(guildId),
+      channelRules: await listChannelRules(guildId),
+    });
+  });
+
+  guild.get("/nodes", async (c) => {
+    const guildId = c.req.param("guildId")!;
+    return c.json(await listNodes(deps.manager, guildId));
+  });
+
+  // ------------------------------------------------------------ playback
+
+  guild.post("/search", async (c) => {
+    const body = actorBody.extend({ query: z.string().min(1) }).parse(
+      await c.req.json(),
+    );
+    const actor = await actorFromWeb(
+      deps.client,
+      c.req.param("guildId")!,
+      body.userId,
+    );
+    return c.json(await deps.players.search(actor, body.query));
+  });
+
+  guild.post("/play", async (c) => {
+    const body = actorBody
+      .extend({
+        query: z.string().min(1),
+        next: z.boolean().optional(),
+        textChannelId: z.string().nullish(),
+      })
+      .parse(await c.req.json());
+    const actor = await actorFromWeb(
+      deps.client,
+      c.req.param("guildId")!,
+      body.userId,
+    );
+    const result = await deps.players.enqueue(actor, body.query, {
+      playNext: body.next ?? false,
+      textChannelId: body.textChannelId ?? null,
+    });
+    return c.json(result);
+  });
+
+  guild.post("/pause", async (c) => {
+    await deps.players.pause(await actorOf(c));
+    return c.json({ ok: true });
+  });
+
+  guild.post("/resume", async (c) => {
+    await deps.players.resume(await actorOf(c));
+    return c.json({ ok: true });
+  });
+
+  guild.post("/skip", async (c) => {
+    const body = actorBody.extend({ to: z.number().int().optional() }).parse(
+      await c.req.json(),
+    );
+    const actor = await actorFromWeb(
+      deps.client,
+      c.req.param("guildId")!,
+      body.userId,
+    );
+    return c.json({ next: await deps.players.skip(actor, body.to) });
+  });
+
+  guild.post("/stop", async (c) => {
+    await deps.players.stop(await actorOf(c));
+    return c.json({ ok: true });
+  });
+
+  guild.post("/shuffle", async (c) => {
+    await deps.players.shuffle(await actorOf(c));
+    return c.json({ ok: true });
+  });
+
+  guild.post("/clear", async (c) => {
+    const removed = await deps.players.clearQueue(await actorOf(c));
+    return c.json({ removed });
+  });
+
+  guild.post("/volume", async (c) => {
+    const body = actorBody
+      .extend({ volume: z.number().int().min(0).max(200) })
+      .parse(await c.req.json());
+    const actor = await actorFromWeb(
+      deps.client,
+      c.req.param("guildId")!,
+      body.userId,
+    );
+    await deps.players.setVolume(actor, body.volume);
+    return c.json({ ok: true });
+  });
+
+  guild.post("/seek", async (c) => {
+    const body = actorBody
+      .extend({ positionMs: z.number().int().min(0) })
+      .parse(await c.req.json());
+    const actor = await actorFromWeb(
+      deps.client,
+      c.req.param("guildId")!,
+      body.userId,
+    );
+    await deps.players.seek(actor, body.positionMs);
+    return c.json({ ok: true });
+  });
+
+  guild.post("/repeat", async (c) => {
+    const body = actorBody
+      .extend({ mode: z.enum(["off", "track", "queue"]) })
+      .parse(await c.req.json());
+    const actor = await actorFromWeb(
+      deps.client,
+      c.req.param("guildId")!,
+      body.userId,
+    );
+    await deps.players.setRepeatMode(actor, body.mode as RepeatMode);
+    return c.json({ ok: true });
+  });
+
+  guild.post("/queue/remove", async (c) => {
+    const body = actorBody
+      .extend({ index: z.number().int().min(0) })
+      .parse(await c.req.json());
+    const actor = await actorFromWeb(
+      deps.client,
+      c.req.param("guildId")!,
+      body.userId,
+    );
+    return c.json({ removed: await deps.players.removeAt(actor, body.index) });
+  });
+
+  guild.post("/queue/move", async (c) => {
+    const body = actorBody
+      .extend({ from: z.number().int().min(0), to: z.number().int().min(0) })
+      .parse(await c.req.json());
+    const actor = await actorFromWeb(
+      deps.client,
+      c.req.param("guildId")!,
+      body.userId,
+    );
+    return c.json({ moved: await deps.players.move(actor, body.from, body.to) });
+  });
+
+  // ---------------------------------------------------------- management
+
+  guild.patch("/settings", async (c) => {
+    const body = actorBody
+      .extend({
+        defaultVolume: z.number().int().min(0).max(200).optional(),
+        stay247: z.boolean().optional(),
+        autoplay: z.boolean().optional(),
+        djMode: z.boolean().optional(),
+        djRoleId: z.string().nullable().optional(),
+      })
+      .parse(await c.req.json());
+    const { userId, ...patch } = body;
+    const actor = await actorFromWeb(
+      deps.client,
+      c.req.param("guildId")!,
+      userId,
+    );
+    assertCan("manage", await deps.players.buildContext(actor));
+    return c.json(await updateGuildSettings(actor.guildId, patch));
+  });
+
+  guild.put("/channel-rules/:channelId", async (c) => {
+    const body = actorBody
+      .extend({
+        djRequired: z.boolean().optional(),
+        canRequest: z.boolean().optional(),
+        locked: z.boolean().optional(),
+      })
+      .parse(await c.req.json());
+    const { userId, ...patch } = body;
+    const actor = await actorFromWeb(
+      deps.client,
+      c.req.param("guildId")!,
+      userId,
+    );
+    assertCan("manage", await deps.players.buildContext(actor));
+    return c.json(
+      await setChannelRule(actor.guildId, c.req.param("channelId")!, patch),
+    );
+  });
+
+  guild.post("/nodes", async (c) => {
+    const body = actorBody
+      .extend({
+        name: z.string().min(1),
+        host: z.string().min(1),
+        port: z.number().int().min(1).max(65535),
+        secure: z.boolean().default(false),
+        password: z.string().min(1),
+        priority: z.number().int().optional(),
+      })
+      .parse(await c.req.json());
+    const { userId, ...input } = body;
+    const actor = await actorFromWeb(
+      deps.client,
+      c.req.param("guildId")!,
+      userId,
+    );
+    assertCan("manage", await deps.players.buildContext(actor));
+    return c.json(await addNode(actor.guildId, input));
+  });
+
+  guild.delete("/nodes/:name", async (c) => {
+    const actor = await actorOf(c);
+    assertCan("manage", await deps.players.buildContext(actor));
+    await removeNode(actor.guildId, c.req.param("name")!);
+    return c.json({ ok: true });
+  });
+
+  guild.post("/nodes/:name/enabled", async (c) => {
+    const body = actorBody.extend({ enabled: z.boolean() }).parse(
+      await c.req.json(),
+    );
+    const actor = await actorFromWeb(
+      deps.client,
+      c.req.param("guildId")!,
+      body.userId,
+    );
+    assertCan("manage", await deps.players.buildContext(actor));
+    await setNodeEnabled(actor.guildId, c.req.param("name")!, body.enabled);
+    return c.json({ ok: true });
+  });
+
+  return app;
+}
+
+export function startApiServer(deps: ApiDeps): { close: () => void } {
+  const app = createApi(deps);
+  let server: ServerType | null = null;
+  server = serve(
+    { fetch: app.fetch, port: env.apiPort, hostname: env.apiHost },
+    (info) => log.info(`internal api on ${env.apiHost}:${info.port}`),
+  );
+  return {
+    close: () => {
+      server?.close();
+    },
+  };
+}

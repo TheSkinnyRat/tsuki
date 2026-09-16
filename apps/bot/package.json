@@ -6,14 +6,15 @@
   "type": "module",
   "main": "src/index.ts",
   "scripts": {
-    "dev": "node --watch src/index.ts",
-    "start": "node src/index.ts",
-    "deploy-commands": "node src/scripts/deploy-commands.ts",
+    "dev": "node --env-file=../../.env --watch src/index.ts",
+    "start": "node --env-file=../../.env src/index.ts",
+    "deploy-commands": "node --env-file=../../.env src/scripts/deploy-commands.ts",
     "typecheck": "tsc --noEmit",
     "test": "node --test \"src/**/*.test.ts\"",
     "build": "echo \"@tsuki/bot runs from source on Node\""
   },
   "dependencies": {
+    "@hono/node-server": "^2.1.1",
     "@tsuki/db": "workspace:*",
     "@tsuki/shared": "workspace:*",
     "discord.js": "^14.25.1",

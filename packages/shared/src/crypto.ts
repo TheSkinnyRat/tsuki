@@ -23,12 +23,14 @@ export function loadSecretKey(raw: string | undefined): Buffer {
       "ENCRYPTION_KEY is not set. Generate one with: openssl rand -base64 32",
     );
   }
-  const candidates = [
+  const candidates: Array<Buffer | null> = [
     /^[0-9a-fA-F]{64}$/.test(raw) ? Buffer.from(raw, "hex") : null,
     Buffer.from(raw, "base64"),
-  ].filter((b): b is Buffer => b !== null && b.length === KEY_BYTES);
+  ];
 
-  const key = candidates[0];
+  const key = candidates.find(
+    (candidate) => candidate !== null && candidate.length === KEY_BYTES,
+  );
   if (!key) {
     throw new SecretKeyError(
       `ENCRYPTION_KEY must decode to ${KEY_BYTES} bytes (base64 or hex).`,

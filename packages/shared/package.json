@@ -11,7 +11,7 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "node --test --experimental-strip-types \"src/**/*.test.ts\"",
+    "test": "node --test \"src/**/*.test.ts\"",
     "build": "echo \"@tsuki/shared is consumed as source\""
   },
   "dependencies": {

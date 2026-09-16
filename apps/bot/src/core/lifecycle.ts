@@ -8,6 +8,35 @@ import { pickAutoplayTrack } from "./autoplay.ts";
 
 const log = createLogger("lifecycle");
 
+export type IdleReason = "queue-ran-out" | "channel-empty";
+
+export const IDLE_REASONS: Record<IdleReason, string> = {
+  "queue-ran-out": "the queue ran out",
+  "channel-empty": "everyone left the channel",
+};
+
+export interface IdleCheck {
+  playing: boolean;
+  queued: number;
+  listeners: number;
+}
+
+/**
+ * Whether a countdown that started for `reason` should still end in leaving.
+ *
+ * Each reason has its own way of being cancelled, and using one test for both
+ * is how "leave the empty channel" never fired: the player alone in the room
+ * was still playing a two-hour mix, and a check for "is it playing" read that
+ * as a reason to stay.
+ */
+export function shouldStillLeave(
+  reason: IdleReason,
+  state: IdleCheck,
+): boolean {
+  if (reason === "channel-empty") return state.listeners === 0;
+  return !state.playing && state.queued === 0;
+}
+
 /** How long Tsuki waits in an idle or empty channel before leaving. */
 const IDLE_LEAVE_MS = 60_000;
 
@@ -97,7 +126,7 @@ export class Lifecycle {
         : "That was the last track.",
     );
     if (settings.stay247) return;
-    this.startIdle(player, "the queue ran out");
+    this.startIdle(player, "queue-ran-out");
   }
 
   private async considerEmptyChannel(player: Player): Promise<void> {
@@ -105,7 +134,7 @@ export class Lifecycle {
     if (settings.stay247) return;
     const listeners = this.humanListeners(player);
     if (listeners > 0) return;
-    this.startIdle(player, "everyone left the channel");
+    this.startIdle(player, "channel-empty");
   }
 
   private humanListeners(player: Player): number {
@@ -120,16 +149,22 @@ export class Lifecycle {
     return count;
   }
 
-  private startIdle(player: Player, reason: string): void {
+  private startIdle(player: Player, reason: IdleReason): void {
     this.cancelIdle(player.guildId);
     const timer = setTimeout(() => {
       this.idleTimers.delete(player.guildId);
       const live = this.manager.getPlayer(player.guildId);
       if (!live) return;
-      // Re-check rather than trust the timer: a track may have been queued,
-      // or somebody may have walked back in, while it was counting down.
-      if (live.playing || live.queue.tracks.length > 0) return;
-      void this.say(live, `Leaving — ${reason}.`);
+      // Re-checked against the reason it started, not against playback in
+      // general: a player alone in an empty channel is playing, and that is
+      // the state being left, not a reason to stay.
+      const stillIdle = shouldStillLeave(reason, {
+        playing: live.playing,
+        queued: live.queue.tracks.length,
+        listeners: this.humanListeners(live),
+      });
+      if (!stillIdle) return;
+      void this.say(live, `Leaving — ${IDLE_REASONS[reason]}.`);
       void live.destroy("idle");
     }, IDLE_LEAVE_MS);
     this.idleTimers.set(player.guildId, timer);

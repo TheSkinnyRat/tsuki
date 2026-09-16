@@ -3,6 +3,9 @@
 import { useState } from "react";
 import type { NodeSummary } from "@tsuki/shared";
 import { api } from "@/lib/api.ts";
+import { Panel, PanelHeader, SmallButton, Switch } from "./ui.tsx";
+
+type Act = (run: () => Promise<unknown>, success?: string) => Promise<void>;
 
 export function NodesPanel({
   guildId,
@@ -11,7 +14,7 @@ export function NodesPanel({
 }: {
   guildId: string;
   nodes: NodeSummary[];
-  onAct: (run: () => Promise<unknown>, success?: string) => Promise<void>;
+  onAct: Act;
 }) {
   const [form, setForm] = useState({
     name: "",
@@ -41,30 +44,34 @@ export function NodesPanel({
   }
 
   return (
-    <div className="grid gap-5 lg:grid-cols-[1.2fr_1fr]">
-      <section className="rounded-xl border border-[var(--color-line)] bg-[var(--color-surface)] p-5">
-        <h2 className="text-sm font-medium">Audio nodes</h2>
-        <p className="mt-1 text-xs text-[var(--color-muted)]">
-          Tsuki plays through the Lavalink node this server provides. What it
-          can play is whatever that node supports.
-        </p>
+    <div className="grid gap-4">
+      <p className="text-[13px] text-[var(--color-muted)]">
+        Tsuki plays through the Lavalink node this server provides. What it can
+        play is whatever that node supports.
+      </p>
 
+      <Panel>
+        <PanelHeader title="Audio nodes" meta={`${nodes.length} configured`} />
         {nodes.length === 0 ? (
-          <p className="mt-5 rounded-lg border border-dashed border-[var(--color-line)] p-4 text-sm text-[var(--color-muted)]">
-            No node yet, so Tsuki cannot play anything here. Add one on the
-            right.
-          </p>
+          <div className="px-4 py-6 text-center text-[12.5px] text-[var(--color-muted)]">
+            No node yet, so Tsuki cannot play anything here.
+          </div>
         ) : (
-          <ul className="mt-4 grid gap-3">
-            {nodes.map((node) => (
-              <li
+          nodes.map((node, index) => {
+            const caps = node.capabilities;
+            return (
+              <div
                 key={node.id}
-                className="rounded-lg border border-[var(--color-line)] p-3"
+                className={`px-4 py-[13px] ${
+                  index === nodes.length - 1
+                    ? ""
+                    : "border-b border-[var(--color-line)]"
+                }`}
               >
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2.5">
                   <span
                     aria-hidden="true"
-                    className={`size-2 rounded-full ${
+                    className={`size-[5px] flex-none rounded-full ${
                       node.connected
                         ? "bg-emerald-500"
                         : node.enabled
@@ -72,137 +79,106 @@ export function NodesPanel({
                           : "bg-[var(--color-muted)]"
                     }`}
                   />
-                  <span className="text-sm font-medium">{node.name}</span>
-                  <span className="font-[family-name:var(--font-mono)] text-[11px] text-[var(--color-muted)]">
-                    {/* An instance node is the operator's machine, not this
-                        guild's, so its address is not theirs to read. */}
-                    {node.instanceProvided
-                      ? "operator's node"
-                      : `${node.host}:${node.port}${node.secure ? " · tls" : ""}`}
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[13.5px]">
+                      {node.name}
+                    </span>
+                    <span className="block truncate font-[family-name:var(--font-mono)] text-[11.5px] text-[var(--color-muted)]">
+                      {node.instanceProvided
+                        ? "operator's node · not yours to change"
+                        : `${node.host}:${node.port}${node.secure ? " · tls" : ""}`}
+                    </span>
                   </span>
-                  <span className="ml-auto flex gap-1">
-                    {node.instanceProvided ? (
-                      <span className="font-[family-name:var(--font-mono)] text-[11px] text-[var(--color-muted)]">
-                        not yours to change
-                      </span>
-                    ) : null}
-                    <button
-                      type="button"
-                      hidden={node.instanceProvided}
-                      onClick={() =>
-                        onAct(
-                          () =>
-                            api.post(guildId, `nodes/${node.name}/enabled`, {
-                              enabled: !node.enabled,
-                            }),
-                          node.enabled ? "Node disabled." : "Node enabled.",
-                        )
-                      }
-                      className="rounded border border-[var(--color-line)] px-2 py-0.5 text-xs transition-colors duration-150 hover:border-[var(--color-accent)]"
-                    >
-                      {node.enabled ? "Disable" : "Enable"}
-                    </button>
-                    <button
-                      type="button"
-                      hidden={node.instanceProvided}
-                      onClick={() =>
-                        onAct(
-                          () => api.del(guildId, `nodes/${node.name}`),
-                          "Node removed.",
-                        )
-                      }
-                      className="rounded border border-[var(--color-line)] px-2 py-0.5 text-xs transition-colors duration-150 hover:border-[var(--color-accent)]"
-                    >
-                      Remove
-                    </button>
-                  </span>
+                  {node.instanceProvided ? null : (
+                    <>
+                      <Switch
+                        label={`${node.name} enabled`}
+                        on={node.enabled}
+                        onChange={(next) =>
+                          onAct(
+                            () =>
+                              api.post(
+                                guildId,
+                                `nodes/${encodeURIComponent(node.name)}/enabled`,
+                                { enabled: next },
+                              ),
+                            next ? "Node enabled." : "Node disabled.",
+                          )
+                        }
+                      />
+                      <button
+                        type="button"
+                        title={`Remove ${node.name}`}
+                        aria-label={`Remove ${node.name}`}
+                        onClick={() =>
+                          onAct(
+                            () =>
+                              api.del(
+                                guildId,
+                                `nodes/${encodeURIComponent(node.name)}`,
+                              ),
+                            "Node removed.",
+                          )
+                        }
+                        className="size-[22px] flex-none cursor-pointer rounded-md border border-transparent bg-transparent text-[13px] leading-none text-[var(--color-muted)] hover:border-[var(--color-line)] hover:text-[var(--color-ink)]"
+                      >
+                        ×
+                      </button>
+                    </>
+                  )}
                 </div>
 
-                {node.capabilities ? (
-                  <dl className="mt-2 grid gap-1 text-xs text-[var(--color-muted)]">
-                    <div>
-                      <dt className="inline font-medium">Lavalink</dt>{" "}
-                      <dd className="inline">{node.capabilities.version}</dd>
-                    </div>
-                    <div>
-                      <dt className="inline font-medium">Sources</dt>{" "}
-                      <dd className="inline">
-                        {node.capabilities.sources.join(", ") || "none"}
-                      </dd>
-                    </div>
-                    {node.capabilities.plugins.length > 0 ? (
-                      <div>
-                        <dt className="inline font-medium">Plugins</dt>{" "}
-                        <dd className="inline">
-                          {node.capabilities.plugins.join(", ")}
-                        </dd>
-                      </div>
-                    ) : null}
-                  </dl>
+                {caps ? (
+                  <div className="mt-2.5 flex flex-wrap gap-1.5 pl-[15px]">
+                    <Tag>lavalink {caps.version}</Tag>
+                    {caps.sources.map((source) => (
+                      <Tag key={source}>{source}</Tag>
+                    ))}
+                    {caps.plugins.map((plugin) => (
+                      <Tag key={plugin} halo>
+                        {plugin}
+                      </Tag>
+                    ))}
+                  </div>
                 ) : null}
-
-                {!node.capabilities?.sources.includes("youtube") ? (
-                  <p className="mt-2 text-xs text-[var(--color-muted)]">
-                    No YouTube source. Lavalink v4 ships that as a separate
-                    plugin — install <code>youtube-source</code> on the node for
-                    YouTube links to work.
+                {caps && !caps.sources.includes("youtube") ? (
+                  <p className="mt-2 pl-[15px] text-xs text-[var(--color-muted)]">
+                    No YouTube source — Lavalink v4 ships it as the separate
+                    youtube-source plugin.
                   </p>
                 ) : null}
-
                 {node.lastError ? (
-                  <p className="mt-2 text-xs text-amber-600 dark:text-amber-400">
+                  <p className="mt-2 pl-[15px] text-xs text-amber-600 dark:text-amber-400">
                     {node.lastError}
                   </p>
                 ) : null}
-              </li>
-            ))}
-          </ul>
+              </div>
+            );
+          })
         )}
-      </section>
+      </Panel>
 
-      <section className="rounded-xl border border-[var(--color-line)] bg-[var(--color-surface)] p-5">
-        <h2 className="text-sm font-medium">Add a node</h2>
-        <form onSubmit={submit} className="mt-3 grid gap-3">
-          <Field
-            label="Name"
-            value={form.name}
-            onChange={(name) => setForm({ ...form, name })}
-            placeholder="main"
-          />
-          <Field
-            label="Host"
-            value={form.host}
-            onChange={(host) => setForm({ ...form, host })}
-            placeholder="lavalink.example.com"
-          />
-          <Field
-            label="Port"
-            value={form.port}
-            onChange={(port) => setForm({ ...form, port })}
-            placeholder="2333"
-          />
-          <Field
-            label="Password"
-            value={form.password}
-            onChange={(password) => setForm({ ...form, password })}
-            placeholder="the node's authorization value"
-            type="password"
-          />
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={form.secure}
-              onChange={(event) =>
-                setForm({ ...form, secure: event.target.checked })
-              }
-              className="accent-[var(--color-accent)]"
+      <Panel>
+        <PanelHeader title="Add a node" />
+        <form onSubmit={submit} className="grid gap-3 px-4 py-[13px]">
+          <div className="grid grid-cols-[1fr_1fr] gap-3 max-sm:grid-cols-1">
+            <Field label="Name" value={form.name} placeholder="main" onChange={(name) => setForm({ ...form, name })} />
+            <Field label="Host" value={form.host} placeholder="lavalink.example.com" onChange={(host) => setForm({ ...form, host })} />
+            <Field label="Port" value={form.port} placeholder="2333" onChange={(port) => setForm({ ...form, port })} />
+            <Field label="Password" type="password" value={form.password} placeholder="authorization value" onChange={(password) => setForm({ ...form, password })} />
+          </div>
+          <div className="flex items-center justify-between gap-4">
+            <span className="text-[13.5px]">Behind HTTPS</span>
+            <Switch
+              label="Behind HTTPS"
+              on={form.secure}
+              onChange={(secure) => setForm({ ...form, secure })}
             />
-            The node is behind HTTPS
-          </label>
+          </div>
           <button
             type="submit"
-            disabled={busy}
-            className="rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white transition-colors duration-150 hover:bg-[var(--color-halo)] disabled:opacity-40"
+            disabled={busy || !form.name.trim() || !form.host.trim()}
+            className="h-9 cursor-pointer rounded-[9px] border-0 bg-[var(--color-accent)] text-[13px] text-[var(--color-on-accent)] hover:opacity-[0.88] disabled:cursor-default disabled:opacity-40"
           >
             {busy ? "Checking the node…" : "Add node"}
           </button>
@@ -212,8 +188,22 @@ export function NodesPanel({
             the hosted instance.
           </p>
         </form>
-      </section>
+      </Panel>
     </div>
+  );
+}
+
+function Tag({ children, halo }: { children: React.ReactNode; halo?: boolean }) {
+  return (
+    <span
+      className={`rounded-full border px-2 py-px font-[family-name:var(--font-mono)] text-[11px] ${
+        halo
+          ? "border-[var(--color-halo)] text-[var(--color-halo)]"
+          : "border-[var(--color-line)] text-[var(--color-muted)]"
+      }`}
+    >
+      {children}
+    </span>
   );
 }
 
@@ -232,15 +222,13 @@ function Field({
 }) {
   return (
     <label className="grid gap-1">
-      <span className="text-xs font-medium text-[var(--color-muted)]">
-        {label}
-      </span>
+      <span className="text-xs text-[var(--color-muted)]">{label}</span>
       <input
         type={type}
         value={value}
         placeholder={placeholder}
         onChange={(event) => onChange(event.target.value)}
-        className="rounded-lg border border-[var(--color-line)] bg-transparent px-3 py-2 text-sm outline-none focus:border-[var(--color-accent)]"
+        className="h-9 rounded-[9px] border border-[var(--color-line)] bg-transparent px-3 text-[13px] text-[var(--color-ink)] outline-none placeholder:text-[var(--color-muted)] focus:border-[var(--color-halo)]"
       />
     </label>
   );

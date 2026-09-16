@@ -65,6 +65,23 @@ export const api = {
       lines: Array<{ timestampMs: number | null; line: string }>;
     }>(guildId, "lyrics"),
 
+  sponsorblock: (guildId: string) =>
+    request<{ categories: string[] }>(guildId, "sponsorblock"),
+  roles: (guildId: string) =>
+    request<Array<{ id: string; name: string; color: string }>>(guildId, "roles"),
+  channels: (guildId: string) =>
+    request<Array<{ id: string; name: string }>>(guildId, "channels"),
+  settingsFull: (guildId: string) =>
+    request<{
+      settings: GuildSettings;
+      channelRules: Array<{
+        channelId: string;
+        djRequired: boolean;
+        canRequest: boolean;
+        locked: boolean;
+      }>;
+    }>(guildId, "settings"),
+
   playlists: (guildId: string) =>
     request<
       Array<{
@@ -79,6 +96,8 @@ export const api = {
     request<T>(guildId, path, { method: "POST", body }),
   patch: <T = unknown>(guildId: string, path: string, body: unknown) =>
     request<T>(guildId, path, { method: "PATCH", body }),
+  put: <T = unknown>(guildId: string, path: string, body: unknown) =>
+    request<T>(guildId, path, { method: "PUT", body }),
   del: <T = unknown>(guildId: string, path: string) =>
     request<T>(guildId, path, { method: "DELETE" }),
 };

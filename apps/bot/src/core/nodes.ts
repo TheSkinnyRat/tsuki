@@ -210,6 +210,18 @@ export async function setNodeEnabled(
   }
 }
 
+async function waitForConnection(
+  node: { connected: boolean },
+  timeoutMs: number,
+): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (node.connected) return true;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  return node.connected;
+}
+
 export async function listNodes(
   manager: LavalinkManager,
   guildId: string,
@@ -323,8 +335,12 @@ export async function syncGuildNodes(
         retryAmount: 5,
         retryDelay: 3_000,
       });
-      // connect() resolves to void here, so it is awaited rather than chained.
+      // connect() only starts the socket. Picking a node straight after
+      // registering it would find it not yet connected and quietly fall back
+      // to the instance node — found when a guild's priority-10 node was
+      // skipped on its very first track — so wait briefly for the handshake.
       await node.connect();
+      await waitForConnection(node, 5_000);
     } catch (error) {
       log.warn(`could not register node ${id}`, error);
     }

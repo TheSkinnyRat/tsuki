@@ -6,6 +6,7 @@ import { createDiscordClient, registerInteractionHandlers } from "./discord/clie
 import { createLavalinkManager, type ManagerHooks } from "./lavalink/manager.ts";
 import { PlayerService } from "./core/player.ts";
 import { Lifecycle } from "./core/lifecycle.ts";
+import { registerFailover } from "./core/failover.ts";
 import { syncGuildNodes } from "./core/nodes.ts";
 import { getGuildSettings } from "./core/guilds.ts";
 import { startApiServer } from "./http/server.ts";
@@ -23,6 +24,10 @@ async function main(): Promise<void> {
   const lifecycle = new Lifecycle({ client, manager, players });
   hooks.autoPlay = (player: Player) => lifecycle.autoPlayFunction(player);
   lifecycle.register();
+  registerFailover(manager, {
+    instanceNodeOffered: env.defaultNode !== null,
+    announce: (player, message) => lifecycle.say(player, message),
+  });
 
   registerInteractionHandlers(client, { players, manager });
 

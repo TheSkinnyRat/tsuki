@@ -101,6 +101,19 @@ export const skipCommand: Command = {
   },
 };
 
+export const previousCommand: Command = {
+  data: new SlashCommandBuilder()
+    .setName("previous")
+    .setDescription("Restart this track, or go back to the one before"),
+  async execute(interaction, { players }) {
+    await interaction.deferReply();
+    const track = await players.previous(actorFromInteraction(interaction));
+    await interaction.editReply({
+      embeds: [noticeEmbed(`Back to **${track.title}**.`)],
+    });
+  },
+};
+
 export const pauseCommand: Command = {
   data: new SlashCommandBuilder()
     .setName("pause")
@@ -427,6 +440,7 @@ export const leaveCommand: Command = {
 export const playbackCommands: Command[] = [
   playCommand,
   lyricsCommand,
+  previousCommand,
   skipCommand,
   pauseCommand,
   resumeCommand,

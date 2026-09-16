@@ -2,24 +2,25 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { PlayerSnapshot } from "@tsuki/shared";
-import { api } from "@/lib/api.ts";
+import { api, ApiError } from "@/lib/api.ts";
+import { Panel, PanelHeader, Row, RowText, SmallButton, Switch } from "./ui.tsx";
+
+type Act = (run: () => Promise<unknown>, success?: string) => Promise<void>;
 
 /**
- * Kept in step with `apps/bot/src/core/filters.ts` by hand.
- *
- * The bot refuses an effect the guild's node does not offer, so a stale entry
- * here produces a clear refusal rather than a switch that silently does
- * nothing — which is why this list is allowed to be a copy at all.
+ * Kept in step with `apps/bot/src/core/filters.ts` by hand. The bot refuses an
+ * effect the guild's node does not offer, so a stale entry here produces a
+ * clear refusal rather than a switch that silently does nothing.
  */
-const EFFECTS: Array<{ name: string; describe: string }> = [
-  { name: "nightcore", describe: "faster and higher" },
-  { name: "vaporwave", describe: "slower and lower" },
-  { name: "8d", describe: "sound circling the head" },
-  { name: "karaoke", describe: "vocals pushed down" },
-  { name: "tremolo", describe: "wobbling volume" },
-  { name: "vibrato", describe: "wobbling pitch" },
-  { name: "lowpass", describe: "highs cut away" },
-  { name: "mono", describe: "both channels merged" },
+const EFFECTS: Array<{ name: string; lavalink: string; describe: string }> = [
+  { name: "nightcore", lavalink: "nightcore", describe: "Faster and higher" },
+  { name: "vaporwave", lavalink: "vaporwave", describe: "Slower and lower" },
+  { name: "8d", lavalink: "rotation", describe: "Sound circling the head" },
+  { name: "karaoke", lavalink: "karaoke", describe: "Vocals pushed down" },
+  { name: "tremolo", lavalink: "tremolo", describe: "Wobbling volume" },
+  { name: "vibrato", lavalink: "vibrato", describe: "Wobbling pitch" },
+  { name: "lowpass", lavalink: "lowPass", describe: "Highs cut away" },
+  { name: "mono", lavalink: "mono", describe: "Both channels merged" },
 ];
 
 const EQ_PRESETS = [
@@ -42,176 +43,259 @@ export function EffectsPanel({
 }: {
   guildId: string;
   player: PlayerSnapshot | null;
-  onAct: (run: () => Promise<unknown>, success?: string) => Promise<void>;
+  onAct: Act;
 }) {
-  const active = new Set(player?.activeFilters ?? []);
   const playing = Boolean(player?.current);
-  const [state, setState] = useState<{ speed: number; pitch: number } | null>(
-    null,
-  );
+  const [state, setState] = useState<{
+    effects: Record<string, boolean | undefined>;
+    speed: number;
+    pitch: number;
+  } | null>(null);
 
-  // The sliders show what is actually applied: nightcore moves speed to 1.29,
-  // and a control parked at 1 while the audio is faster is a control that lies.
+  // Read from the node, not from the snapshot: nightcore moves speed to 1.29×,
+  // and a control parked at 1× while the audio is faster is a control that lies.
   const load = useCallback(async () => {
     if (!playing) return setState(null);
     const filters = await api.filters(guildId).catch(() => null);
-    setState(filters ? { speed: filters.speed, pitch: filters.pitch } : null);
+    setState(
+      filters
+        ? { effects: filters.effects, speed: filters.speed, pitch: filters.pitch }
+        : null,
+    );
   }, [guildId, playing]);
 
+  const activeKey = player?.activeFilters.join(",");
   useEffect(() => {
     void load();
-  }, [load, player?.activeFilters.join(",")]);
+  }, [load, activeKey]);
 
-  // Lavalink's own filter names, mapped to the ones a listener recognises.
-  const isOn = (effect: string) =>
-    effect === "8d"
-      ? active.has("rotation")
-      : effect === "lowpass"
-        ? active.has("lowPass")
-        : active.has(effect);
+  const run = async (call: () => Promise<unknown>, success?: string) => {
+    await onAct(call, success);
+    await load();
+  };
 
   return (
-    <div className="grid max-w-4xl gap-5 lg:grid-cols-2">
-      <section className="min-w-0 rounded-xl border border-[var(--color-line)] bg-[var(--color-surface)] p-5">
-        <h2 className="text-sm font-medium">Effects</h2>
-        <p className="mt-1 text-xs text-[var(--color-muted)]">
-          {playing
-            ? "Applied to what is playing right now."
-            : "Start something first — effects apply to a live player."}
+    <div className="grid gap-4">
+      {!playing ? (
+        <p className="text-[13px] text-[var(--color-muted)]">
+          Effects apply to a live player — start something first.
         </p>
+      ) : null}
 
-        <div className="mt-4 grid gap-2">
-          {EFFECTS.map((effect) => (
-            <button
-              key={effect.name}
-              type="button"
+      <Panel>
+        <PanelHeader title="Effects" meta="applied to what is playing" />
+        {EFFECTS.map((effect, index) => (
+          <Row key={effect.name} last={index === EFFECTS.length - 1}>
+            <RowText title={effect.name} detail={effect.describe} />
+            <Switch
+              label={effect.name}
               disabled={!playing}
-              onClick={() =>
-                onAct(() =>
+              on={Boolean(state?.effects[effect.name])}
+              onChange={() =>
+                run(() =>
                   api.post(guildId, "filters/toggle", { effect: effect.name }),
                 )
               }
-              className={`flex items-center justify-between rounded-lg border px-3 py-2 text-left transition-colors duration-150 disabled:opacity-40 ${
-                isOn(effect.name)
-                  ? "border-[var(--color-accent)] bg-[var(--color-soft)]"
-                  : "border-[var(--color-line)] hover:border-[var(--color-accent)]"
-              }`}
-            >
-              <span>
-                <span className="block text-sm font-medium">{effect.name}</span>
-                <span className="block text-xs text-[var(--color-muted)]">
-                  {effect.describe}
-                </span>
-              </span>
-              <span className="font-[family-name:var(--font-mono)] text-[11px] text-[var(--color-muted)]">
-                {isOn(effect.name) ? "on" : "off"}
-              </span>
-            </button>
-          ))}
-        </div>
+            />
+          </Row>
+        ))}
+      </Panel>
 
-        <button
-          type="button"
-          disabled={!playing}
-          onClick={() =>
-            onAct(
-              () => api.post(guildId, "filters/reset"),
-              "Every effect cleared.",
-            )
-          }
-          className="mt-4 w-full rounded-lg border border-[var(--color-line)] py-2 text-sm transition-colors duration-150 hover:border-[var(--color-accent)] disabled:opacity-40"
-        >
-          Clear everything
-        </button>
-      </section>
-
-      <section className="min-w-0 rounded-xl border border-[var(--color-line)] bg-[var(--color-surface)] p-5">
-        <h2 className="text-sm font-medium">Equaliser</h2>
-        <p className="mt-1 text-xs text-[var(--color-muted)]">
-          Presets, applied to the whole player.
-        </p>
-        <div className="mt-4 flex flex-wrap gap-2">
+      <Panel>
+        <PanelHeader title="Equaliser" meta="presets" />
+        <div className="flex flex-wrap gap-2 px-4 py-[13px]">
           {EQ_PRESETS.map((preset) => (
-            <button
+            <SmallButton
               key={preset}
-              type="button"
+              className="h-7"
               disabled={!playing}
               onClick={() =>
-                onAct(
+                run(
                   () => api.post(guildId, "filters/eq", { preset }),
                   `Equaliser set to ${preset}.`,
                 )
               }
-              className="rounded-lg border border-[var(--color-line)] px-3 py-1.5 text-xs transition-colors duration-150 hover:border-[var(--color-accent)] disabled:opacity-40"
             >
               {preset}
-            </button>
+            </SmallButton>
           ))}
         </div>
+      </Panel>
 
-        <h3 className="mt-6 text-sm font-medium">Speed and pitch</h3>
-        <div className="mt-3 grid gap-3">
-          <Slider
-            label="Speed"
-            value={state?.speed ?? 1}
-            disabled={!playing}
-            onCommit={async (value) => {
-              await onAct(
-                () => api.post(guildId, "filters/timescale", { speed: value }),
-                `Speed ${value}×.`,
-              );
-              await load();
-            }}
-          />
-          <Slider
-            label="Pitch"
-            value={state?.pitch ?? 1}
-            disabled={!playing}
-            onCommit={async (value) => {
-              await onAct(
-                () => api.post(guildId, "filters/timescale", { pitch: value }),
-                `Pitch ${value}×.`,
-              );
-              await load();
-            }}
-          />
-        </div>
-      </section>
+      <Panel>
+        <PanelHeader title="Speed and pitch" />
+        <Timescale
+          label="Speed"
+          value={state?.speed ?? 1}
+          disabled={!playing}
+          onCommit={(value) =>
+            run(
+              () => api.post(guildId, "filters/timescale", { speed: value }),
+              `Speed ${value.toFixed(2)}×.`,
+            )
+          }
+        />
+        <Timescale
+          label="Pitch"
+          last
+          value={state?.pitch ?? 1}
+          disabled={!playing}
+          onCommit={(value) =>
+            run(
+              () => api.post(guildId, "filters/timescale", { pitch: value }),
+              `Pitch ${value.toFixed(2)}×.`,
+            )
+          }
+        />
+      </Panel>
+
+      <SmallButton
+        muted
+        disabled={!playing}
+        onClick={() =>
+          run(() => api.post(guildId, "filters/reset"), "Every effect cleared.")
+        }
+      >
+        Clear every effect
+      </SmallButton>
+
+      <SponsorBlock guildId={guildId} playing={playing} onAct={onAct} />
     </div>
   );
 }
 
-function Slider({
+const MIN = 0.5;
+const MAX = 2;
+
+function Timescale({
   label,
   value,
   disabled,
   onCommit,
+  last,
 }: {
   label: string;
   value: number;
   disabled: boolean;
   onCommit: (value: number) => void;
+  last?: boolean;
 }) {
+  const pct = ((Math.min(MAX, Math.max(MIN, value)) - MIN) / (MAX - MIN)) * 100;
   return (
-    <label className="grid gap-1">
-      <span className="flex justify-between text-xs font-medium text-[var(--color-muted)]">
-        <span>{label}</span>
-        <span className="font-[family-name:var(--font-mono)]">
-          {value.toFixed(2)}×
+    <div
+      className={`flex items-center gap-3 px-4 py-[13px] ${
+        last ? "" : "border-b border-[var(--color-line)]"
+      }`}
+    >
+      <span className="w-12 text-[13.5px]">{label}</span>
+      <span
+        role="slider"
+        aria-label={label}
+        aria-valuemin={MIN}
+        aria-valuemax={MAX}
+        aria-valuenow={value}
+        onClick={(event) => {
+          if (disabled) return;
+          const rect = event.currentTarget.getBoundingClientRect();
+          const ratio = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
+          const next = Math.round((MIN + ratio * (MAX - MIN)) * 20) / 20;
+          onCommit(next);
+        }}
+        className={`flex h-3.5 flex-1 items-center ${disabled ? "opacity-40" : "cursor-pointer"}`}
+      >
+        <span className="relative block h-[3px] w-full rounded-sm bg-[var(--color-line)]">
+          <span
+            className="absolute inset-y-0 left-0 block rounded-sm bg-[var(--color-accent)]"
+            style={{ width: `${pct}%` }}
+          />
         </span>
       </span>
-      <input
-        key={value}
-        type="range"
-        min={0.5}
-        max={2}
-        step={0.05}
-        defaultValue={value}
-        disabled={disabled}
-        onMouseUp={(event) => onCommit(Number(event.currentTarget.value))}
-        onTouchEnd={(event) => onCommit(Number(event.currentTarget.value))}
-        className="accent-[var(--color-accent)] disabled:opacity-40"
-      />
-    </label>
+      <span className="w-12 text-right font-[family-name:var(--font-mono)] text-[11.5px] text-[var(--color-muted)]">
+        {value.toFixed(2)}×
+      </span>
+    </div>
+  );
+}
+
+const SEGMENTS: Array<[string, string]> = [
+  ["sponsor", "Paid promotion"],
+  ["selfpromo", "Unpaid self-promotion"],
+  ["interaction", "Like and subscribe reminders"],
+  ["intro", "Intro animation"],
+  ["outro", "Endcards and credits"],
+  ["preview", "Recap or preview"],
+  ["music_offtopic", "Non-music section in a music video"],
+  ["filler", "Filler tangents"],
+];
+
+/**
+ * Loaded once when the tab opens rather than with the poll: it is a plugin on
+ * the guild's node, usually absent, and the refusal names the missing plugin.
+ */
+function SponsorBlock({
+  guildId,
+  playing,
+  onAct,
+}: {
+  guildId: string;
+  playing: boolean;
+  onAct: Act;
+}) {
+  const [state, setState] = useState<
+    { kind: "loading" } | { kind: "ok"; on: string[] } | { kind: "refused"; message: string }
+  >({ kind: "loading" });
+
+  const load = useCallback(async () => {
+    if (!playing) return setState({ kind: "refused", message: "Start something first." });
+    try {
+      const found = await api.sponsorblock(guildId);
+      setState({ kind: "ok", on: found.categories });
+    } catch (error) {
+      setState({
+        kind: "refused",
+        message: error instanceof ApiError ? error.message : "Could not read SponsorBlock.",
+      });
+    }
+  }, [guildId, playing]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const toggle = async (category: string, next: boolean) => {
+    if (state.kind !== "ok") return;
+    const chosen = next
+      ? [...state.on, category]
+      : state.on.filter((value) => value !== category);
+    await onAct(
+      () =>
+        chosen.length === 0
+          ? api.del(guildId, "sponsorblock")
+          : api.put(guildId, "sponsorblock", { categories: chosen }),
+      chosen.length === 0 ? "SponsorBlock off." : "SponsorBlock updated.",
+    );
+    await load();
+  };
+
+  return (
+    <Panel>
+      <PanelHeader title="SponsorBlock" meta="needs the plugin on your node" />
+      {state.kind === "ok" ? (
+        SEGMENTS.map(([category, detail], index) => (
+          <Row key={category} last={index === SEGMENTS.length - 1}>
+            <RowText title={category} detail={detail} />
+            <Switch
+              label={category}
+              on={state.on.includes(category)}
+              onChange={(next) => toggle(category, next)}
+            />
+          </Row>
+        ))
+      ) : (
+        <div className="px-4 py-[13px] text-[12.5px] text-[var(--color-muted)]">
+          {state.kind === "loading" ? "Checking the node…" : state.message}
+        </div>
+      )}
+    </Panel>
   );
 }

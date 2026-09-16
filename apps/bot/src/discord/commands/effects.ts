@@ -5,6 +5,7 @@ import {
   type EffectName,
   type EqPreset,
 } from "../../core/filters.ts";
+import { SEGMENT_CATEGORIES } from "../../core/sponsorblock.ts";
 import { actorFromInteraction } from "../actor.ts";
 import { noticeEmbed } from "../embeds.ts";
 import type { Command } from "./types.ts";
@@ -153,4 +154,57 @@ export const filterCommand: Command = {
   },
 };
 
-export const effectCommands: Command[] = [filterCommand];
+export const sponsorBlockCommand: Command = {
+  data: new SlashCommandBuilder()
+    .setName("sponsorblock")
+    .setDescription("Skip sponsor reads and intros (needs the plugin on your node)")
+    .addSubcommand((sub) =>
+      sub.setName("show").setDescription("Which segment types are skipped"),
+    )
+    .addSubcommand((sub) =>
+      sub
+        .setName("set")
+        .setDescription("Choose segment types to skip")
+        .addStringOption((option) =>
+          option
+            .setName("categories")
+            .setDescription(`Comma-separated: ${SEGMENT_CATEGORIES.join(", ")}`)
+            .setRequired(true),
+        ),
+    )
+    .addSubcommand((sub) =>
+      sub.setName("off").setDescription("Stop skipping segments"),
+    ),
+  async execute(interaction, { players }) {
+    await interaction.deferReply();
+    const actor = actorFromInteraction(interaction);
+    const sub = interaction.options.getSubcommand();
+    if (sub === "show") {
+      const segments = await players.sponsorBlock(actor.guildId);
+      await interaction.editReply({
+        embeds: [
+          noticeEmbed(
+            segments.length > 0
+              ? `Skipping: **${segments.join(", ")}**.`
+              : "No segments are skipped.",
+          ),
+        ],
+      });
+      return;
+    }
+    if (sub === "off") {
+      await players.clearSponsorBlock(actor);
+      await interaction.editReply({ embeds: [noticeEmbed("SponsorBlock off.")] });
+      return;
+    }
+    const chosen = await players.setSponsorBlock(
+      actor,
+      interaction.options.getString("categories", true).split(","),
+    );
+    await interaction.editReply({
+      embeds: [noticeEmbed(`Now skipping **${chosen.join(", ")}**.`)],
+    });
+  },
+};
+
+export const effectCommands: Command[] = [filterCommand, sponsorBlockCommand];

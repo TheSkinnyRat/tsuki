@@ -3,7 +3,7 @@ import type { LavalinkManager, Player, Track } from "lavalink-client";
 import { createLogger } from "../logger.ts";
 import { nowPlayingEmbed, noticeEmbed } from "../discord/embeds.ts";
 import { getGuildSettings } from "./guilds.ts";
-import type { PlayerService } from "./player.ts";
+import { STOPPING, type PlayerService } from "./player.ts";
 import { pickAutoplayTrack } from "./autoplay.ts";
 import { forgetUnplayable } from "./history.ts";
 
@@ -122,6 +122,7 @@ export class Lifecycle {
 
   /** The hook lavalink-client calls before it declares the queue finished. */
   autoPlayFunction = async (player: Player): Promise<void> => {
+    if (player.get(STOPPING)) return;
     const settings = await getGuildSettings(player.guildId);
     if (!settings.autoplay) {
       log.debug(`autoplay is off in ${player.guildId}`);
@@ -137,6 +138,7 @@ export class Lifecycle {
   };
 
   private async onQueueEnd(player: Player): Promise<void> {
+    if (player.get(STOPPING)) return;
     const settings = await getGuildSettings(player.guildId);
     await this.say(
       player,
@@ -206,7 +208,7 @@ export class Lifecycle {
       .catch((error: unknown) => log.debug("could not announce", error));
   }
 
-  private async say(player: Player, message: string): Promise<void> {
+  async say(player: Player, message: string): Promise<void> {
     const channel = await this.textChannel(player);
     if (!channel) return;
     await channel

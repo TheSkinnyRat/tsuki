@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth.ts";
 import { bot, BotError } from "@/lib/bot.ts";
+import { forwardBody } from "@/lib/forward.ts";
 
 /**
  * The browser's door to the bot.
@@ -17,6 +18,7 @@ const ALLOWED_POST = new Set([
   "search",
   "pause",
   "resume",
+  "previous",
   "skip",
   "stop",
   "shuffle",
@@ -85,6 +87,12 @@ export async function GET(_request: Request, { params }: Params) {
         return NextResponse.json(await bot.filters(guildId));
       case "lyrics":
         return NextResponse.json(await bot.lyrics(guildId));
+      case "sponsorblock":
+        return NextResponse.json(await bot.sponsorblock(guildId));
+      case "roles":
+        return NextResponse.json(await bot.roles(guildId));
+      case "channels":
+        return NextResponse.json(await bot.channels(guildId));
       default:
         return NextResponse.json(
           { error: { code: "NOT_FOUND", message: "No such view." } },
@@ -110,13 +118,12 @@ export async function POST(request: Request, { params }: Params) {
     );
   }
 
-  const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
   // Whatever the page claimed about who it is, the session decides.
-  delete body["userId"];
+  const body = forwardBody(await request.json().catch(() => ({})), userId);
 
   try {
     return NextResponse.json(
-      await bot.action(guildId, path, { ...body, userId }),
+      await bot.action(guildId, path, body),
     );
   } catch (error) {
     return fail(error);
@@ -136,13 +143,33 @@ export async function PATCH(request: Request, { params }: Params) {
       { status: 404 },
     );
   }
-  const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
-  delete body["userId"];
+  const body = forwardBody(await request.json().catch(() => ({})), userId);
 
   try {
     return NextResponse.json(
-      await bot.patch(guildId, "settings", { ...body, userId }),
+      await bot.patch(guildId, "settings", body),
     );
+  } catch (error) {
+    return fail(error);
+  }
+}
+
+export async function PUT(request: Request, { params }: Params) {
+  const userId = await resolveActor();
+  if (!userId) {
+    return NextResponse.json({ error: { code: "UNAUTHENTICATED" } }, { status: 401 });
+  }
+  const { guildId, action } = await params;
+  const path = action.join("/");
+  if (!/^channel-rules\/\d+$/.test(path) && path !== "sponsorblock") {
+    return NextResponse.json(
+      { error: { code: "NOT_FOUND", message: "No such action." } },
+      { status: 404 },
+    );
+  }
+  const body = forwardBody(await request.json().catch(() => ({})), userId);
+  try {
+    return NextResponse.json(await bot.put(guildId, path, body));
   } catch (error) {
     return fail(error);
   }
@@ -155,7 +182,7 @@ export async function DELETE(_request: Request, { params }: Params) {
   }
   const { guildId, action } = await params;
   const path = action.join("/");
-  if (!/^(nodes|playlists)\/[^/]+$/.test(path)) {
+  if (!/^(nodes|playlists)\/[^/]+$/.test(path) && path !== "sponsorblock") {
     return NextResponse.json(
       { error: { code: "NOT_FOUND", message: "No such action." } },
       { status: 404 },

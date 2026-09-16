@@ -20,5 +20,13 @@ export default async function GuildDashboard({
   // decides whether the page is worth rendering.
   if (!guild) notFound();
 
-  return <DashboardClient guildId={guildId} guildName={guild.name} />;
+  return (
+    <DashboardClient
+      guildId={guildId}
+      guildName={guild.name}
+      guildIcon={guild.icon}
+      guilds={guilds.map(({ id, name, icon }) => ({ id, name, icon }))}
+      userImage={session?.user?.image ?? null}
+    />
+  );
 }

@@ -20,6 +20,12 @@ import {
 import { assertNodeAvailable, sourcesForGuild } from "./nodes.ts";
 import { currentLyrics, type LyricsResult } from "./lyrics.ts";
 import {
+  clearSegments,
+  parseCategories,
+  readSegments,
+  setSegments,
+} from "./sponsorblock.ts";
+import {
   applyEqPreset,
   readFilterState,
   resetFilters,
@@ -40,6 +46,9 @@ import { createLogger } from "../logger.ts";
 import { DisplayNames } from "./names.ts";
 
 const log = createLogger("player");
+
+/** Player data key set while a member is deliberately stopping playback. */
+export const STOPPING = "tsuki:stopping";
 
 /**
  * Which source manager a request needs, so a node that lacks it can say so
@@ -115,6 +124,12 @@ export class PlayerService {
     return this.manager.getPlayer(guildId);
   }
 
+  private channelName(guildId: string, channelId: string | null): string | null {
+    if (!channelId) return null;
+    const channel = this.client.guilds.cache.get(guildId)?.channels.cache.get(channelId);
+    return channel?.name ?? null;
+  }
+
   /** Humans (not bots) sitting in a voice channel. */
   private listenerCount(guildId: string, channelId: string | null): number {
     if (!channelId) return 0;
@@ -188,6 +203,9 @@ export class PlayerService {
         guildId,
         connected: false,
         voiceChannelId: null,
+        voiceChannelName: null,
+        listenerCount: 0,
+        hasPrevious: false,
         textChannelId: null,
         playing: false,
         paused: false,
@@ -210,6 +228,9 @@ export class PlayerService {
       guildId,
       connected: Boolean(player.connected),
       voiceChannelId: player.voiceChannelId,
+      voiceChannelName: this.channelName(guildId, player.voiceChannelId),
+      listenerCount: this.listenerCount(guildId, player.voiceChannelId),
+      hasPrevious: player.queue.previous.length > 0,
       textChannelId: player.textChannelId,
       playing: player.playing,
       paused: player.paused,
@@ -309,6 +330,7 @@ export class PlayerService {
       });
     }
     if (!player.connected) await player.connect();
+    player.set(STOPPING, false);
 
     const result = await player.search({ query }, { id: actor.userId }, false);
     const tracks = (result.tracks ?? []) as Track[];
@@ -353,10 +375,37 @@ export class PlayerService {
       await player.stopPlaying(false, false);
       return null;
     }
+    // Read what comes next BEFORE skipping. After `skip()` resolves the
+    // player has not necessarily switched yet, so `queue.current` can still be
+    // the track being skipped — which is how /skip once announced the wrong one.
+    const upcoming = player.queue.tracks[to ? to - 1 : 0] as Track | undefined;
     await player.skip(to);
-    return player.queue.current
-      ? toTrackInfo(player.queue.current as Track)
-      : null;
+    return upcoming ? this.describe(actor.guildId, upcoming) : null;
+  }
+
+  /**
+   * Back one track, the way a music player's ◀◀ behaves: a few seconds in, it
+   * restarts the current track; right at the start, it goes to the one before.
+   * The current track is put back at the front of the queue so nothing is lost.
+   */
+  async previous(actor: Actor): Promise<TrackInfo> {
+    const player = this.requirePlayer(actor.guildId);
+    await this.authorise("control", actor);
+    const current = player.queue.current as Track;
+
+    const earlier = player.queue.previous[0];
+    if (player.position > 5_000 || !earlier) {
+      if (!current.info.isSeekable) {
+        throw new ServiceError("INVALID_INPUT", "There is nothing to go back to.");
+      }
+      await player.seek(0);
+      return this.describe(actor.guildId, current);
+    }
+
+    player.queue.previous.shift();
+    await player.queue.add([earlier, current], 0);
+    await player.skip();
+    return this.describe(actor.guildId, earlier);
   }
 
   async pause(actor: Actor): Promise<void> {
@@ -378,6 +427,10 @@ export class PlayerService {
     if (!player) return;
     await this.authorise("control", actor);
     const settings = await getGuildSettings(actor.guildId);
+    // Marked first: stopping empties the queue, and without the mark the
+    // lifecycle reads that as the queue running out and autoplay starts a new
+    // track right after somebody asked for silence.
+    player.set(STOPPING, true);
     await player.stopPlaying(true, false);
     if (leave && !settings.stay247) {
       await player.destroy("stopped by a member");
@@ -535,6 +588,24 @@ export class PlayerService {
     return currentLyrics(this.manager, this.requirePlayer(guildId));
   }
 
+  async sponsorBlock(guildId: string): Promise<string[]> {
+    return readSegments(this.requirePlayer(guildId));
+  }
+
+  async setSponsorBlock(actor: Actor, categories: string[]): Promise<string[]> {
+    const player = this.requirePlayer(actor.guildId);
+    await this.authorise("control", actor);
+    const parsed = parseCategories(categories);
+    await setSegments(player, parsed);
+    return parsed;
+  }
+
+  async clearSponsorBlock(actor: Actor): Promise<void> {
+    const player = this.requirePlayer(actor.guildId);
+    await this.authorise("control", actor);
+    await clearSegments(player);
+  }
+
   // ----------------------------------------------------------- playlists
 
   async savePlaylistFromQueue(
@@ -615,6 +686,7 @@ export class PlayerService {
     }
     if (!player.connected) await player.connect();
 
+    player.set(STOPPING, false);
     await player.queue.add(decoded);
     if (!player.playing && !player.paused) await player.play();
 

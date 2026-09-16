@@ -37,6 +37,10 @@ export interface PlayerSnapshot {
   guildId: string;
   connected: boolean;
   voiceChannelId: string | null;
+  /** Name of that voice channel, for the "#lounge · 14 listening" chip. */
+  voiceChannelName: string | null;
+  /** Humans (not bots) in that voice channel right now. */
+  listenerCount: number;
   textChannelId: string | null;
   playing: boolean;
   paused: boolean;
@@ -50,6 +54,8 @@ export interface PlayerSnapshot {
   current: TrackInfo | null;
   queue: TrackInfo[];
   queueLengthMs: number;
+  /** Whether there is a track to go back to. */
+  hasPrevious: boolean;
   /** Filters currently applied, by Lavalink's own names. */
   activeFilters: string[];
 }

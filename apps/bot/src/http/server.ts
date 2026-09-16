@@ -122,6 +122,28 @@ export function createApi(deps: ApiDeps): Hono {
     });
   });
 
+  // Discord's own pickers do these jobs inside /settings; the dashboard has no
+  // picker to borrow, so it asks for the lists instead.
+  guild.get("/roles", (c) => {
+    const target = deps.client.guilds.cache.get(c.req.param("guildId")!);
+    if (!target) throw new ServiceError("NOT_FOUND", "Tsuki is not in that server.");
+    const roles = [...target.roles.cache.values()]
+      .filter((role) => role.id !== target.id && !role.managed)
+      .sort((a, b) => b.position - a.position)
+      .map((role) => ({ id: role.id, name: role.name, color: role.hexColor }));
+    return c.json(roles);
+  });
+
+  guild.get("/channels", (c) => {
+    const target = deps.client.guilds.cache.get(c.req.param("guildId")!);
+    if (!target) throw new ServiceError("NOT_FOUND", "Tsuki is not in that server.");
+    const channels = [...target.channels.cache.values()]
+      .filter((channel) => channel.isVoiceBased())
+      .sort((a, b) => ("position" in a && "position" in b ? a.position - b.position : 0))
+      .map((channel) => ({ id: channel.id, name: channel.name }));
+    return c.json(channels);
+  });
+
   guild.get("/nodes", async (c) => {
     const guildId = c.req.param("guildId")!;
     return c.json(await listNodes(deps.manager, guildId));
@@ -159,6 +181,10 @@ export function createApi(deps: ApiDeps): Hono {
       textChannelId: body.textChannelId ?? null,
     });
     return c.json(result);
+  });
+
+  guild.post("/previous", async (c) => {
+    return c.json({ track: await deps.players.previous(await actorOf(c)) });
   });
 
   guild.post("/pause", async (c) => {
@@ -264,6 +290,23 @@ export function createApi(deps: ApiDeps): Hono {
   guild.get("/lyrics", async (c) =>
     c.json(await deps.players.lyrics(c.req.param("guildId")!)),
   );
+
+  guild.get("/sponsorblock", async (c) =>
+    c.json({ categories: await deps.players.sponsorBlock(c.req.param("guildId")!) }),
+  );
+
+  guild.put("/sponsorblock", async (c) => {
+    const body = actorBody
+      .extend({ categories: z.array(z.string()).min(1) })
+      .parse(await c.req.json());
+    const actor = await actorFromWeb(deps.client, c.req.param("guildId")!, body.userId);
+    return c.json({ categories: await deps.players.setSponsorBlock(actor, body.categories) });
+  });
+
+  guild.delete("/sponsorblock", async (c) => {
+    await deps.players.clearSponsorBlock(await actorOf(c));
+    return c.json({ ok: true });
+  });
 
   // ------------------------------------------------------------- filters
 

@@ -29,6 +29,7 @@ export const CAPABILITIES: Capability[] = [
   { id: "queue-a-track", discord: "play", web: { method: "POST", path: "/play" } },
   { id: "search-and-pick", discord: "search", web: { method: "POST", path: "/search" } },
   { id: "skip", discord: "skip", web: { method: "POST", path: "/skip" } },
+  { id: "previous", discord: "previous", web: { method: "POST", path: "/previous" } },
   { id: "pause", discord: "pause", web: { method: "POST", path: "/pause" } },
   { id: "resume", discord: "resume", web: { method: "POST", path: "/resume" } },
   { id: "stop", discord: "stop", web: { method: "POST", path: "/stop" } },
@@ -108,6 +109,22 @@ export const CAPABILITIES: Capability[] = [
     web: { method: "POST", path: "/filters/reset" },
   },
 
+  {
+    id: "read-sponsorblock",
+    discord: "sponsorblock show",
+    web: { method: "GET", path: "/sponsorblock" },
+  },
+  {
+    id: "set-sponsorblock",
+    discord: "sponsorblock set",
+    web: { method: "PUT", path: "/sponsorblock" },
+  },
+  {
+    id: "clear-sponsorblock",
+    discord: "sponsorblock off",
+    web: { method: "DELETE", path: "/sponsorblock" },
+  },
+
   // playlists
   {
     id: "list-playlists",
@@ -182,6 +199,18 @@ export const CAPABILITIES: Capability[] = [
     id: "default-volume",
     discord: "settings volume",
     web: { method: "PATCH", path: "/settings" },
+  },
+  {
+    id: "list-roles",
+    discord: null,
+    web: { method: "GET", path: "/roles" },
+    why: "Discord's own role picker in /settings dj already lists them",
+  },
+  {
+    id: "list-voice-channels",
+    discord: null,
+    web: { method: "GET", path: "/channels" },
+    why: "Discord's own channel picker in /settings channel already lists them",
   },
   {
     id: "channel-rules",

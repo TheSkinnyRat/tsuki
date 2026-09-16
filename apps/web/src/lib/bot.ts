@@ -80,6 +80,15 @@ export const bot = {
   lyrics: (guildId: string) =>
     call<Record<string, unknown>>(`/api/guilds/${guildId}/lyrics`),
 
+  sponsorblock: (guildId: string) =>
+    call<{ categories: string[] }>(`/api/guilds/${guildId}/sponsorblock`),
+  roles: (guildId: string) =>
+    call<unknown[]>(`/api/guilds/${guildId}/roles`),
+  channels: (guildId: string) =>
+    call<unknown[]>(`/api/guilds/${guildId}/channels`),
+  put: <T>(guildId: string, path: string, body: Record<string, unknown>) =>
+    call<T>(`/api/guilds/${guildId}/${path}`, { method: "PUT", body }),
+
   playlists: (guildId: string) =>
     call<Array<{ name: string; trackCount: number; totalLengthMs: number; createdBy: string }>>(
       `/api/guilds/${guildId}/playlists`,

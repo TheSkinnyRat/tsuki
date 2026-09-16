@@ -3,15 +3,19 @@
 /* Tsuki's palette, taken from the design Purwa supplied. Tokens rather than
    literals so the dark scheme is one block, not a sweep through the markup. */
 @theme {
+  /* Values copied from the supplied design's THEMES object. `accent` is the
+     deep navy used for play, switches and progress; `halo` is the lighter
+     indigo for labels, hover and the "on" state of icon buttons. */
   --color-bg: #fcfbf3;
-  --color-surface: #ffffff;
+  --color-surface: #fffeec;
   --color-ink: #101536;
-  --color-muted: #6b7086;
-  --color-line: #e7e5d8;
-  --color-accent: #474fb0;
+  --color-muted: #5c638c;
+  --color-line: #e4e2d4;
+  --color-accent: #1b2257;
+  --color-on-accent: #fffeec;
   --color-soft: #d1ccff;
-  --color-halo: #6b76d8;
-  --font-sans: Geist, "Helvetica Neue", Helvetica, ui-sans-serif, system-ui, sans-serif;
+  --color-halo: #474fb0;
+  --font-sans: Geist, Helvetica, ui-sans-serif, system-ui, sans-serif;
   --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
@@ -22,27 +26,29 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
-    --color-bg: #0d1020;
-    --color-surface: #161a2e;
-    --color-ink: #eceaf5;
-    --color-muted: #9a9fba;
-    --color-line: #262b44;
-    --color-accent: #8f97ea;
-    --color-soft: #2a2f55;
-    --color-halo: #a7adf2;
+    --color-bg: #0a0d22;
+    --color-surface: #101536;
+    --color-ink: #f3f2e6;
+    --color-muted: #98a0c9;
+    --color-line: #232a5c;
+    --color-accent: #97a8ff;
+    --color-on-accent: #101536;
+    --color-soft: #1b2257;
+    --color-halo: #97a8ff;
   }
 }
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --color-bg: #0d1020;
-  --color-surface: #161a2e;
-  --color-ink: #eceaf5;
-  --color-muted: #9a9fba;
-  --color-line: #262b44;
-  --color-accent: #8f97ea;
-  --color-soft: #2a2f55;
-  --color-halo: #a7adf2;
+  --color-bg: #0a0d22;
+  --color-surface: #101536;
+  --color-ink: #f3f2e6;
+  --color-muted: #98a0c9;
+  --color-line: #232a5c;
+  --color-accent: #97a8ff;
+  --color-on-accent: #101536;
+  --color-soft: #1b2257;
+  --color-halo: #97a8ff;
 }
 
 html,
@@ -71,4 +77,20 @@ body {
   50% {
     transform: scaleY(1);
   }
+}
+
+/* The design's placeholder artwork: thin diagonal hatching in the halo colour. */
+.hatch {
+  background: repeating-linear-gradient(
+    135deg,
+    transparent 0 7px,
+    color-mix(in oklab, var(--color-halo) 26%, transparent) 7px 8px
+  );
+}
+.hatch-sm {
+  background: repeating-linear-gradient(
+    135deg,
+    transparent 0 5px,
+    color-mix(in oklab, var(--color-halo) 26%, transparent) 5px 6px
+  );
 }

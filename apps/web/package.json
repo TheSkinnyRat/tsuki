@@ -8,7 +8,8 @@
     "dev": "next dev --port 3860",
     "build": "next build",
     "start": "next start --port 3860",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node --test \"src/**/*.test.ts\""
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.10.0",

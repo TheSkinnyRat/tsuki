@@ -70,6 +70,12 @@ export const CAPABILITIES: Capability[] = [
     web: { method: "POST", path: "/stop" },
   },
 
+  {
+    id: "read-lyrics",
+    discord: "lyrics",
+    web: { method: "GET", path: "/lyrics" },
+  },
+
   // effects
   {
     id: "toggle-effect",

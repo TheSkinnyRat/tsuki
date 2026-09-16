@@ -106,10 +106,16 @@ function progressBar(position: number, length: number, width = 18): string {
   return `${"─".repeat(filled)}●${"─".repeat(Math.max(0, width - filled - 1))}`;
 }
 
+export const QUEUE_PAGE_SIZE = 10;
+
+export function queuePageCount(total: number, perPage = QUEUE_PAGE_SIZE): number {
+  return Math.max(1, Math.ceil(total / perPage));
+}
+
 export function queueEmbed(
   snapshot: PlayerSnapshot,
   page: number,
-  perPage = 10,
+  perPage = QUEUE_PAGE_SIZE,
 ): EmbedBuilder {
   const embed = new EmbedBuilder().setColor(ACCENT).setTitle("Queue");
 
@@ -161,7 +167,10 @@ export function nodesEmbed(nodes: NodeSummary[]): EmbedBuilder {
         : "disabled";
     const caps = node.capabilities;
     embed.addFields({
-      name: `${node.name} · ${node.host}:${node.port}`,
+      // An instance node belongs to the operator, so its address is not shown.
+      name: node.instanceProvided
+        ? node.name
+        : `${node.name} · ${node.host}:${node.port}`,
       value: [
         state,
         caps ? `Lavalink ${caps.version}` : null,

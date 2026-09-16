@@ -58,6 +58,13 @@ export const api = {
       equalizerApplied: boolean;
       availableOnNode: string[];
     }>(guildId, "filters"),
+  lyrics: (guildId: string) =>
+    request<{
+      provider: string | null;
+      text: string | null;
+      lines: Array<{ timestampMs: number | null; line: string }>;
+    }>(guildId, "lyrics"),
+
   playlists: (guildId: string) =>
     request<
       Array<{

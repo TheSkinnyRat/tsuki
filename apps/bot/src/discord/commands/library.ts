@@ -162,7 +162,8 @@ export const playlistCommand: Command = {
           option
             .setName("name")
             .setDescription("Which playlist")
-            .setRequired(true),
+            .setRequired(true)
+            .setAutocomplete(true),
         )
         .addBooleanOption((option) =>
           option.setName("shuffle").setDescription("Shuffle it on the way in"),
@@ -176,7 +177,8 @@ export const playlistCommand: Command = {
           option
             .setName("name")
             .setDescription("Which playlist")
-            .setRequired(true),
+            .setRequired(true)
+            .setAutocomplete(true),
         ),
     ),
 

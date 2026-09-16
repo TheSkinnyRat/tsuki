@@ -18,6 +18,7 @@ import {
   type PermissionContext,
 } from "./permissions.ts";
 import { assertNodeAvailable, sourcesForGuild } from "./nodes.ts";
+import { currentLyrics, type LyricsResult } from "./lyrics.ts";
 import {
   applyEqPreset,
   readFilterState,
@@ -527,6 +528,11 @@ export class PlayerService {
     const player = this.requirePlayer(actor.guildId);
     await this.authorise("control", actor);
     await resetFilters(player);
+  }
+
+  /** Reading lyrics changes nothing, so it needs no actor. */
+  async lyrics(guildId: string): Promise<LyricsResult> {
+    return currentLyrics(this.manager, this.requirePlayer(guildId));
   }
 
   // ----------------------------------------------------------- playlists

@@ -120,7 +120,11 @@ export const nodeCommand: Command = {
         .setName("remove")
         .setDescription("Forget a node")
         .addStringOption((option) =>
-          option.setName("name").setDescription("Node name").setRequired(true),
+          option
+            .setName("name")
+            .setDescription("Node name")
+            .setRequired(true)
+            .setAutocomplete(true),
         ),
     )
     .addSubcommand((sub) =>
@@ -128,7 +132,11 @@ export const nodeCommand: Command = {
         .setName("enable")
         .setDescription("Use this node again")
         .addStringOption((option) =>
-          option.setName("name").setDescription("Node name").setRequired(true),
+          option
+            .setName("name")
+            .setDescription("Node name")
+            .setRequired(true)
+            .setAutocomplete(true),
         ),
     )
     .addSubcommand((sub) =>
@@ -136,7 +144,11 @@ export const nodeCommand: Command = {
         .setName("disable")
         .setDescription("Stop using this node without deleting it")
         .addStringOption((option) =>
-          option.setName("name").setDescription("Node name").setRequired(true),
+          option
+            .setName("name")
+            .setDescription("Node name")
+            .setRequired(true)
+            .setAutocomplete(true),
         ),
     ),
 

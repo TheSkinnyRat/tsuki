@@ -160,6 +160,7 @@ export function DashboardClient({
         {tab === "now" ? (
           <div className={NOW_GRID}>
             <NowPlaying
+              guildId={guildId}
               player={player}
               positionMs={shownPosition}
               nodes={nodes}

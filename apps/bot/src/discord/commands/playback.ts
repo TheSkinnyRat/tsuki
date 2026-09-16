@@ -1,4 +1,11 @@
-import { SlashCommandBuilder } from "discord.js";
+import {
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  SlashCommandBuilder,
+  type ButtonInteraction,
+} from "discord.js";
+import type { PlayerService } from "../../core/player.ts";
 import type { RepeatMode } from "@tsuki/shared";
 import { ServiceError } from "../../core/errors.ts";
 import { actorFromInteraction } from "../actor.ts";
@@ -8,6 +15,7 @@ import {
   noticeEmbed,
   nowPlayingEmbed,
   queueEmbed,
+  queuePageCount,
 } from "../embeds.ts";
 import type { Command } from "./types.ts";
 
@@ -138,6 +146,32 @@ export const nowPlayingCommand: Command = {
   },
 };
 
+export const QUEUE_PAGE_ID = "tsuki:queue-page";
+
+/**
+ * Paging buttons carry the page they lead to, and the queue is re-read when
+ * one is pressed. Nothing about the list is stored between presses, so a page
+ * opened after somebody skipped shows what is there now rather than a copy of
+ * what was there then.
+ */
+function queueButtons(page: number, pages: number): ActionRowBuilder<ButtonBuilder>[] {
+  if (pages <= 1) return [];
+  return [
+    new ActionRowBuilder<ButtonBuilder>().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`${QUEUE_PAGE_ID}:${page - 1}`)
+        .setLabel("Previous")
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(page <= 1),
+      new ButtonBuilder()
+        .setCustomId(`${QUEUE_PAGE_ID}:${page + 1}`)
+        .setLabel("Next")
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(page >= pages),
+    ),
+  ];
+}
+
 export const queueCommand: Command = {
   data: new SlashCommandBuilder()
     .setName("queue")
@@ -149,11 +183,37 @@ export const queueCommand: Command = {
     await interaction.deferReply();
     const actor = actorFromInteraction(interaction);
     const snapshot = await players.snapshot(actor.guildId);
+    const pages = queuePageCount(snapshot.queue.length);
+    const page = Math.min(
+      Math.max(interaction.options.getInteger("page") ?? 1, 1),
+      pages,
+    );
     await interaction.editReply({
-      embeds: [queueEmbed(snapshot, interaction.options.getInteger("page") ?? 1)],
+      embeds: [queueEmbed(snapshot, page)],
+      components: queueButtons(page, pages),
     });
   },
 };
+
+export async function handleQueuePage(
+  interaction: ButtonInteraction,
+  context: { players: PlayerService },
+): Promise<boolean> {
+  if (!interaction.customId.startsWith(`${QUEUE_PAGE_ID}:`)) return false;
+  if (!interaction.inGuild() || !interaction.guildId) return true;
+
+  await interaction.deferUpdate();
+  const requested = Number(interaction.customId.split(":")[2] ?? "1");
+  const snapshot = await context.players.snapshot(interaction.guildId);
+  const pages = queuePageCount(snapshot.queue.length);
+  const page = Math.min(Math.max(requested, 1), pages);
+
+  await interaction.editReply({
+    embeds: [queueEmbed(snapshot, page)],
+    components: queueButtons(page, pages),
+  });
+  return true;
+}
 
 export const volumeCommand: Command = {
   data: new SlashCommandBuilder()
@@ -314,6 +374,31 @@ export const seekCommand: Command = {
   },
 };
 
+export const lyricsCommand: Command = {
+  data: new SlashCommandBuilder()
+    .setName("lyrics")
+    .setDescription("Lyrics for what is playing, if the node can find them"),
+  async execute(interaction, { players }) {
+    await interaction.deferReply();
+    const actor = actorFromInteraction(interaction);
+    const found = await players.lyrics(actor.guildId);
+    const body =
+      found.text ??
+      found.lines.map((line) => line.line).join("\n");
+    await interaction.editReply({
+      embeds: [
+        noticeEmbed(
+          body.length > 3900 ? `${body.slice(0, 3900)}\n…` : body || "(empty)",
+        ).setFooter(
+          found.provider
+            ? { text: `via ${found.provider}` }
+            : null,
+        ),
+      ],
+    });
+  },
+};
+
 export const joinCommand: Command = {
   data: new SlashCommandBuilder()
     .setName("join")
@@ -341,6 +426,7 @@ export const leaveCommand: Command = {
 
 export const playbackCommands: Command[] = [
   playCommand,
+  lyricsCommand,
   skipCommand,
   pauseCommand,
   resumeCommand,

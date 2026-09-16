@@ -17,4 +17,5 @@ export const commandsByName = new Map(
 
 export { handleModal } from "./config.ts";
 export { handleSearchSelect } from "./library.ts";
+export { handleQueuePage } from "./playback.ts";
 export type { Command, CommandContext } from "./types.ts";

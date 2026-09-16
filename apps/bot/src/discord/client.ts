@@ -10,10 +10,12 @@ import { createLogger } from "../logger.ts";
 import {
   commandsByName,
   handleModal,
+  handleQueuePage,
   handleSearchSelect,
   type CommandContext,
 } from "./commands/index.ts";
 import { errorEmbed } from "./embeds.ts";
+import { handleAutocomplete } from "./autocomplete.ts";
 
 const log = createLogger("discord");
 
@@ -72,6 +74,16 @@ export function registerInteractionHandlers(
         return;
       }
 
+      if (interaction.isAutocomplete()) {
+        await handleAutocomplete(interaction);
+        return;
+      }
+
+      if (interaction.isButton()) {
+        await handleQueuePage(interaction, context);
+        return;
+      }
+
       if (interaction.isStringSelectMenu()) {
         await handleSearchSelect(interaction, context);
         return;
@@ -80,7 +92,8 @@ export function registerInteractionHandlers(
       if (
         interaction.isChatInputCommand() ||
         interaction.isModalSubmit() ||
-        interaction.isStringSelectMenu()
+        interaction.isStringSelectMenu() ||
+        interaction.isButton()
       ) {
         await reportFailure(interaction, error);
       }

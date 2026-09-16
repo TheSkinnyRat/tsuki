@@ -261,6 +261,10 @@ export function createApi(deps: ApiDeps): Hono {
     return c.json({ moved: await deps.players.move(actor, body.from, body.to) });
   });
 
+  guild.get("/lyrics", async (c) =>
+    c.json(await deps.players.lyrics(c.req.param("guildId")!)),
+  );
+
   // ------------------------------------------------------------- filters
 
   guild.get("/filters", (c) =>

@@ -1,13 +1,16 @@
 "use client";
 
+import { useState } from "react";
 import type { NodeSummary, PlayerSnapshot } from "@tsuki/shared";
-import { formatDuration } from "@/lib/api.ts";
+import { api, ApiError, formatDuration } from "@/lib/api.ts";
 
 export function NowPlaying({
+  guildId,
   player,
   positionMs,
   nodes,
 }: {
+  guildId: string;
   player: PlayerSnapshot | null;
   positionMs: number;
   nodes: NodeSummary[];
@@ -102,6 +105,63 @@ export function NowPlaying({
           Effects on: {player.activeFilters.join(", ")}
         </p>
       ) : null}
+
+      <Lyrics guildId={guildId} trackKey={current.identifier} />
     </section>
+  );
+}
+
+/**
+ * Fetched on demand rather than with every poll: lyrics come from a plugin on
+ * the guild's node, most nodes do not have one, and asking twice a second for
+ * something that is usually a refusal is rude to somebody else's machine.
+ */
+function Lyrics({
+  guildId,
+  trackKey,
+}: {
+  guildId: string;
+  trackKey: string;
+}) {
+  const [state, setState] = useState<
+    { status: "idle" } | { status: "loading" } | { status: "done"; text: string }
+  >({ status: "idle" });
+
+  if (state.status === "done") {
+    return (
+      <div className="mt-4 border-t border-[var(--color-line)] pt-3">
+        <pre className="max-h-64 overflow-auto text-xs whitespace-pre-wrap text-[var(--color-muted)]">
+          {state.text}
+        </pre>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      disabled={state.status === "loading"}
+      onClick={async () => {
+        setState({ status: "loading" });
+        try {
+          const found = await api.lyrics(guildId);
+          const body =
+            found.text ?? found.lines.map((line) => line.line).join("\n");
+          setState({ status: "done", text: body || "(empty)" });
+        } catch (error) {
+          setState({
+            status: "done",
+            text:
+              error instanceof ApiError
+                ? error.message
+                : "Could not fetch lyrics.",
+          });
+        }
+      }}
+      className="mt-4 w-full rounded-lg border border-[var(--color-line)] py-2 text-xs transition-colors duration-150 hover:border-[var(--color-accent)] disabled:opacity-40"
+      key={trackKey}
+    >
+      {state.status === "loading" ? "Looking…" : "Show lyrics"}
+    </button>
   );
 }

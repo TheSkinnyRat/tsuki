@@ -116,9 +116,17 @@ export const previousCommand: Command = {
     .setDescription("Restart this track, or go back to the one before"),
   async execute(interaction, { players }) {
     await interaction.deferReply();
-    const track = await players.previous(actorFromInteraction(interaction));
+    const { track, restarted } = await players.previous(
+      actorFromInteraction(interaction),
+    );
     await interaction.editReply({
-      embeds: [noticeEmbed(`Back to **${track.title}**.`)],
+      embeds: [
+        noticeEmbed(
+          restarted
+            ? `Restarted **${track.title}**.`
+            : `Back to **${track.title}**.`,
+        ),
+      ],
     });
   },
 };

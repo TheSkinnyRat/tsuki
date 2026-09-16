@@ -184,7 +184,7 @@ export function createApi(deps: ApiDeps): Hono {
   });
 
   guild.post("/previous", async (c) => {
-    return c.json({ track: await deps.players.previous(await actorOf(c)) });
+    return c.json(await deps.players.previous(await actorOf(c)));
   });
 
   guild.post("/pause", async (c) => {

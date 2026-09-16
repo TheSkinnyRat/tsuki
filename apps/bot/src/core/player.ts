@@ -243,10 +243,16 @@ export class PlayerService {
         ? this.describe(guildId, player.queue.current as Track)
         : null,
       queue,
-      queueLengthMs: queue.reduce(
-        (total, track) => total + (track.isStream ? 0 : track.lengthMs),
-        0,
-      ),
+      // "Left" means until the room goes quiet, so the rest of the track that
+      // is playing counts too, not only what is queued behind it.
+      queueLengthMs:
+        queue.reduce(
+          (total, track) => total + (track.isStream ? 0 : track.lengthMs),
+          0,
+        ) +
+        (player.queue.current && !player.queue.current.info.isStream
+          ? Math.max(0, (player.queue.current.info.duration ?? 0) - player.position)
+          : 0),
       activeFilters: this.activeFilters(player),
     };
   }
@@ -388,7 +394,9 @@ export class PlayerService {
    * restarts the current track; right at the start, it goes to the one before.
    * The current track is put back at the front of the queue so nothing is lost.
    */
-  async previous(actor: Actor): Promise<TrackInfo> {
+  async previous(
+    actor: Actor,
+  ): Promise<{ track: TrackInfo; restarted: boolean }> {
     const player = this.requirePlayer(actor.guildId);
     await this.authorise("control", actor);
     const current = player.queue.current as Track;
@@ -399,13 +407,13 @@ export class PlayerService {
         throw new ServiceError("INVALID_INPUT", "There is nothing to go back to.");
       }
       await player.seek(0);
-      return this.describe(actor.guildId, current);
+      return { track: this.describe(actor.guildId, current), restarted: true };
     }
 
     player.queue.previous.shift();
     await player.queue.add([earlier, current], 0);
     await player.skip();
-    return this.describe(actor.guildId, earlier);
+    return { track: this.describe(actor.guildId, earlier), restarted: false };
   }
 
   async pause(actor: Actor): Promise<void> {

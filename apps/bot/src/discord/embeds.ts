@@ -22,20 +22,15 @@ export function formatDuration(ms: number): string {
 
 function trackLine(track: TrackInfo): string {
   const length = track.isStream ? "live" : formatDuration(track.lengthMs);
+  // The title stays exact and outside the link: Discord neither unescapes
+  // inside link text nor tolerates brackets there, and rewriting "[2018]" to
+  // "(2018)" changes what the member reads.
   const title = track.uri
-    ? `[${linkText(track.title)}](${track.uri})`
-    : escapeMarkdown(track.title);
+    ? `**${escapeMarkdown(track.title)}** [↗](${track.uri})`
+    : `**${escapeMarkdown(track.title)}**`;
   return `${title} · ${escapeMarkdown(track.author)} · \`${length}\``;
 }
 
-/**
- * Text inside a markdown link. Discord does not unescape backslashes there, so
- * the escaping that is right for plain text shows up as literal "\[2018\]".
- * Only the brackets can break a link, so only they are swapped out.
- */
-function linkText(text: string): string {
-  return text.replace(/\[/g, "(").replace(/\]/g, ")");
-}
 
 function escapeMarkdown(text: string): string {
   return text.replace(/([*_`~\\|\[\]])/g, "\\$1");

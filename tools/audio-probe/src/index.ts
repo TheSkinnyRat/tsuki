@@ -70,30 +70,58 @@ async function main(): Promise<void> {
   });
 
   const guild = await client.guilds.fetch(guildId);
-  let connection: VoiceConnection;
-  try {
-    connection = joinVoiceChannel({
-      channelId,
-      guildId,
-      adapterCreator: guild.voiceAdapterCreator,
+
+  /**
+   * Joining is retried because Discord's voice handshake fails transiently —
+   * three times during one evening's testing it went `signalling → disconnected`
+   * with the permissions and the channel unchanged, and succeeded on the next
+   * attempt. A probe that gives up on the first one reports "SILENT" for a bot
+   * that is playing perfectly well, which is the worst thing a test instrument
+   * can do.
+   */
+  const ATTEMPTS = 3;
+  let connection: VoiceConnection | null = null;
+  for (let attempt = 1; attempt <= ATTEMPTS; attempt += 1) {
+    try {
+      connection = await joinOnce(guild, channelId);
+      break;
+    } catch (error) {
+      console.error(
+        JSON.stringify({ event: "join-failed", attempt, error: String(error) }),
+      );
+      connection?.destroy();
+      connection = null;
+      if (attempt < ATTEMPTS) await new Promise((r) => setTimeout(r, 4000));
+    }
+  }
+  if (!connection) {
+    console.error(`could not join the voice channel after ${ATTEMPTS} attempts`);
+    await client.destroy();
+    process.exit(1);
+  }
+
+  async function joinOnce(
+    target: typeof guild,
+    channel: string,
+  ): Promise<VoiceConnection> {
+    const attempt = joinVoiceChannel({
+      channelId: channel,
+      guildId: target.id,
+      adapterCreator: target.voiceAdapterCreator,
       // Deafened, we would receive nothing at all; muted, we send nothing.
       selfDeaf: false,
       selfMute: true,
     });
-    connection.on("stateChange", (from, to) =>
+    attempt.on("stateChange", (from, to) =>
       console.log(
         JSON.stringify({ event: "voice-state", from: from.status, to: to.status }),
       ),
     );
-    connection.on("error", (error) =>
+    attempt.on("error", (error) =>
       console.error(JSON.stringify({ event: "voice-error", error: String(error) })),
     );
-    await entersState(connection, VoiceConnectionStatus.Ready, 30_000);
-  } catch (error) {
-    console.error("could not join the voice channel:", error);
-    console.error("last voice state:", connection!?.state?.status);
-    await client.destroy();
-    process.exit(1);
+    await entersState(attempt, VoiceConnectionStatus.Ready, 30_000);
+    return attempt;
   }
 
   console.log(

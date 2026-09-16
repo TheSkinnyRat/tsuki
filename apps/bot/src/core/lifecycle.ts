@@ -5,6 +5,7 @@ import { nowPlayingEmbed, noticeEmbed } from "../discord/embeds.ts";
 import { getGuildSettings } from "./guilds.ts";
 import type { PlayerService } from "./player.ts";
 import { pickAutoplayTrack } from "./autoplay.ts";
+import { forgetUnplayable } from "./history.ts";
 
 const log = createLogger("lifecycle");
 
@@ -79,6 +80,18 @@ export class Lifecycle {
       log.warn(
         `track error in ${player.guildId}: ${payload.exception?.message ?? "unknown"}`,
       );
+      // A track this guild's node cannot play is not a track this guild has
+      // listened to, and leaving it in the history means autoplay keeps
+      // choosing it and going quiet. Found when autoplay picked a YouTube
+      // entry on a node whose address YouTube refuses.
+      void forgetUnplayable(
+        player.guildId,
+        (track as Track | null)?.encoded,
+      ).then((count) => {
+        if (count > 0) {
+          log.debug(`dropped ${count} history rows the node cannot play`);
+        }
+      });
       void this.say(
         player,
         `Could not play **${track?.info.title ?? "that track"}** — ${
@@ -110,9 +123,15 @@ export class Lifecycle {
   /** The hook lavalink-client calls before it declares the queue finished. */
   autoPlayFunction = async (player: Player): Promise<void> => {
     const settings = await getGuildSettings(player.guildId);
-    if (!settings.autoplay) return;
+    if (!settings.autoplay) {
+      log.debug(`autoplay is off in ${player.guildId}`);
+      return;
+    }
     const next = await pickAutoplayTrack(this.manager, player);
-    if (!next) return;
+    if (!next) {
+      log.debug(`autoplay found nothing to play in ${player.guildId}`);
+      return;
+    }
     await player.queue.add(next);
     log.debug(`autoplay queued ${next.info.title} in ${player.guildId}`);
   };

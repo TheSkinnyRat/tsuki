@@ -1,0 +1,203 @@
+// Tsuki database schema.
+//
+// PORTABILITY RULE — read before adding a field.
+// This schema stays inside the subset SQLite and PostgreSQL both support, so a
+// deployment can move from one to the other by changing `provider` alone.
+// That means: no `enum`, no scalar lists, no `Json`. Use `String` with the
+// allowed values listed in a comment, and a separate row per repeated value.
+// Breaking this rule is a one-line change here and a rewrite later.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------- guild state
+
+model Guild {
+  id        String @id // Discord snowflake
+  name      String?
+  iconHash  String?
+
+  // playback defaults
+  defaultVolume Int     @default(30)
+  stay247       Boolean @default(false) // hold the voice channel when it empties
+  autoplay      Boolean @default(false) // keep playing from this guild's history
+
+  // permissions
+  djMode   Boolean @default(false) // when on, restricted actions need the DJ role
+  djRoleId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  nodes        Node[]
+  channelRules ChannelRule[]
+  playlists    Playlist[]
+  history      PlayHistory[]
+}
+
+/// A Lavalink node supplied by the guild, not by us. The password is stored
+/// encrypted (AES-256-GCM); see packages/shared/src/crypto.ts.
+model Node {
+  id      String @id @default(cuid())
+  guildId String
+  guild   Guild  @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  name        String
+  host        String
+  port        Int
+  secure      Boolean @default(false)
+  passwordEnc String
+  enabled     Boolean @default(true)
+  priority    Int     @default(0) // higher wins when several are healthy
+
+  // capability snapshot taken from GET /v4/info when the node is saved or probed.
+  // Comma-separated because the portability rule forbids scalar lists.
+  infoVersion String?
+  infoSources String?
+  infoPlugins String?
+  infoFilters String?
+
+  lastOkAt   DateTime?
+  lastError  String?
+  lastProbed DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([guildId, name])
+  @@index([guildId, enabled])
+}
+
+/// Per-channel overrides. `channelId` is a voice or text channel snowflake.
+model ChannelRule {
+  id      String @id @default(cuid())
+  guildId String
+  guild   Guild  @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  channelId  String
+  djRequired Boolean @default(false)
+  canRequest Boolean @default(true) // may tracks be queued from here
+  locked     Boolean @default(false) // only the DJ role may make the bot join
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([guildId, channelId])
+}
+
+// ------------------------------------------------------------------ playlists
+
+model Playlist {
+  id      String @id @default(cuid())
+  guildId String
+  guild   Guild  @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  name        String
+  description String?
+  createdBy   String // Discord user id
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tracks PlaylistTrack[]
+
+  @@unique([guildId, name])
+}
+
+model PlaylistTrack {
+  id         String   @id @default(cuid())
+  playlistId String
+  playlist   Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+
+  position Int
+  encoded  String // Lavalink's encoded track blob
+  title    String
+  author   String
+  uri      String?
+  artworkUrl String?
+  lengthMs Int
+  isStream Boolean @default(false)
+  sourceName String?
+
+  addedBy   String
+  createdAt DateTime @default(now())
+
+  @@index([playlistId, position])
+}
+
+/// What a guild has actually listened to. Feeds autoplay, and the "recently
+/// played" list in the dashboard.
+model PlayHistory {
+  id      String @id @default(cuid())
+  guildId String
+  guild   Guild  @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  encoded    String
+  title      String
+  author     String
+  uri        String?
+  artworkUrl String?
+  lengthMs   Int
+  sourceName String?
+
+  requestedBy String? // null when autoplay picked it
+  channelId   String?
+  playedAt    DateTime @default(now())
+
+  @@index([guildId, playedAt])
+}
+
+// ----------------------------------------------------------- web auth (Auth.js)
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+
+  accounts Account[]
+  sessions Session[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}

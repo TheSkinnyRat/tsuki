@@ -1,0 +1,39 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# secrets — never commit
+.env
+.env.*
+!.env.example
+
+# build output
+dist/
+build/
+.next/
+out/
+*.tsbuildinfo
+
+# databases
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+prisma/*.db*
+
+# logs / runtime
+logs/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# local lavalink (for contributors who run a node in-tree)
+lavalink/plugins/
+lavalink/Lavalink.jar
+lavalink/application.yml
+
+# editors / os
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json

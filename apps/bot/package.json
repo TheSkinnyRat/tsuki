@@ -1,0 +1,28 @@
+{
+  "name": "@tsuki/bot",
+  "version": "0.1.0",
+  "private": true,
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "node --watch src/index.ts",
+    "start": "node src/index.ts",
+    "deploy-commands": "node src/scripts/deploy-commands.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test \"src/**/*.test.ts\"",
+    "build": "echo \"@tsuki/bot runs from source on Node\""
+  },
+  "dependencies": {
+    "@tsuki/db": "workspace:*",
+    "@tsuki/shared": "workspace:*",
+    "discord.js": "^14.25.1",
+    "hono": "^4.9.6",
+    "lavalink-client": "^2.5.9",
+    "zod": "^4.1.5"
+  },
+  "devDependencies": {
+    "@types/node": "^24.5.0",
+    "typescript": "^5.9.2"
+  }
+}

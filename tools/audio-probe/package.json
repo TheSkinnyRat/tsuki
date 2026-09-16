@@ -1,0 +1,20 @@
+{
+  "name": "@tsuki/audio-probe",
+  "version": "0.1.0",
+  "private": true,
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "description": "Joins a voice channel as a second bot and reports whether real audio is arriving. A development instrument, not part of the product.",
+  "scripts": {
+    "probe": "node src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@discordjs/voice": "^0.19.0",
+    "discord.js": "^14.25.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.5.0",
+    "typescript": "^5.9.2"
+  }
+}

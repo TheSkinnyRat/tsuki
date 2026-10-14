@@ -34,22 +34,47 @@ tools/audio-probe Development instrument: proves audio really reaches a channel
 
 ## Development
 
-Requirements: Node 22+, pnpm 10+, a Lavalink v4 node, and Java 17+ if you run
-that node yourself.
+Requirements: Node 22+, pnpm 10+, Docker (for PostgreSQL), a Lavalink v4 node,
+and Java 17+ if you run that node yourself.
 
 ```bash
 pnpm install
 cp .env.example .env        # then fill DISCORD_TOKEN and the secrets
-pnpm db:push
+docker compose -f deploy/compose.dev.yml up -d   # PostgreSQL on 127.0.0.1:5432
+pnpm db:deploy              # apply the migrations
 pnpm dev:bot                # the Discord bot
 pnpm dev:web                # the dashboard, on http://127.0.0.1:3860
 ```
+
+Changing the schema: edit `packages/db/prisma/schema.prisma`, then
+`pnpm db:migrate --name <what changed>` writes the migration and applies it.
+The bot's history tests use the same database, in a throwaway schema they drop
+afterwards; without PostgreSQL they skip and say why.
 
 Register the slash commands once, in a test guild so they appear immediately:
 
 ```bash
 pnpm --filter @tsuki/bot run deploy-commands <guild id>
 ```
+
+## Deployment
+
+`deploy/` runs one instance with Docker Compose: PostgreSQL, a one-shot
+migration step, the bot and the dashboard, all from the image the root
+`Dockerfile` builds. Only the dashboard is published, and only on
+`127.0.0.1:3860` — put a reverse proxy in front of it (`deploy/Caddyfile` is
+the one tsukibot.app uses, behind Cloudflare with Authenticated Origin Pulls).
+
+```bash
+cp deploy/tsuki.env.example deploy/tsuki.env      # fill it in
+openssl rand -hex 24 > deploy/pg_password.txt     # and put it in DATABASE_URL
+docker compose -f deploy/compose.yml up -d --build
+docker compose -f deploy/compose.yml run --rm bot node src/scripts/deploy-commands.ts
+```
+
+The last line registers the slash commands globally, which Discord takes up to
+an hour to roll out. Updating is `git pull` and the `up -d --build` line again;
+migrations run before the new bot and dashboard start.
 
 ### Opening the dashboard without an OAuth application
 

@@ -17,7 +17,8 @@
     "dev:web": "pnpm --filter @tsuki/web dev",
     "db:generate": "pnpm --filter @tsuki/db generate",
     "db:push": "pnpm --filter @tsuki/db push",
-    "db:migrate": "pnpm --filter @tsuki/db migrate"
+    "db:migrate": "pnpm --filter @tsuki/db migrate",
+    "db:deploy": "pnpm --filter @tsuki/db run migrate:deploy"
   },
   "devDependencies": {
     "typescript": "^5.9.2"

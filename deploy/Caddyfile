@@ -1,0 +1,21 @@
+# tsukibot.app behind the Cloudflare proxy (SSL mode "Full (strict)").
+#
+# The certificate is a Cloudflare Origin CA certificate, and Authenticated
+# Origin Pulls is on: Cloudflare presents a client certificate on every
+# request, so a connection made straight to the server's IP is refused during
+# the TLS handshake instead of being served past Cloudflare's protection.
+{
+	auto_https off
+	grace_period 5s
+}
+
+https://tsukibot.app:443 {
+	tls /etc/caddy/tls/origin.pem /etc/caddy/tls/origin.key {
+		client_auth {
+			mode require_and_verify
+			trust_pool file /etc/caddy/tls/cf-origin-pull-ca.pem
+		}
+	}
+	encode zstd gzip
+	reverse_proxy 127.0.0.1:3860
+}

@@ -1,8 +1,9 @@
 // Tsuki database schema.
 //
 // PORTABILITY RULE — read before adding a field.
-// This schema stays inside the subset SQLite and PostgreSQL both support, so a
-// deployment can move from one to the other by changing `provider` alone.
+// Tsuki runs on PostgreSQL. The schema still stays inside the subset SQLite
+// and PostgreSQL both support, so a self-hoster can switch `provider` to
+// "sqlite" (and regenerate the migrations) without rewriting a model.
 // That means: no `enum`, no scalar lists, no `Json`. Use `String` with the
 // allowed values listed in a comment, and a separate row per repeated value.
 // Breaking this rule is a one-line change here and a rewrite later.
@@ -12,7 +13,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 

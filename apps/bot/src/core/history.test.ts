@@ -1,27 +1,32 @@
 import { after, before, test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createRequire } from "node:module";
 
 /**
- * Runs against a real SQLite database rather than a stand-in.
+ * Runs against a real PostgreSQL database rather than a stand-in.
  *
  * What is worth checking here is the scoping — that pruning a track removes
  * this guild's rows for it and nobody else's — and a fake that records the
  * arguments would only check that this file passes what this file passes. The
- * schema is pushed into a throwaway file, so nothing touches the dev data.
+ * schema is pushed into a throwaway Postgres schema, dropped afterwards, so
+ * nothing touches the dev data. Without a database the tests say so and skip.
  */
 
-const workdir = mkdtempSync(join(tmpdir(), "tsuki-history-"));
-const databaseUrl = `file:${join(workdir, "test.db")}`;
+const baseUrl = process.env["TEST_DATABASE_URL"] ?? process.env["DATABASE_URL"];
+const usable = baseUrl?.startsWith("postgres") ?? false;
+const schemaName = `tsuki_test_${process.pid}_${Date.now()}`;
+const databaseUrl = usable
+  ? `${baseUrl}${baseUrl!.includes("?") ? "&" : "?"}schema=${schemaName}`
+  : "";
+const skip = usable ? false : "needs PostgreSQL in TEST_DATABASE_URL or DATABASE_URL";
 
 let forgetUnplayable: typeof import("./history.ts").forgetUnplayable;
 let prisma: typeof import("@tsuki/db").prisma;
 
 before(async () => {
+  if (!usable) return;
   process.env["DATABASE_URL"] = databaseUrl;
   const repoRoot = join(import.meta.dirname, "../../../..");
   const schema = join(repoRoot, "packages/db/prisma/schema.prisma");
@@ -45,8 +50,11 @@ before(async () => {
 });
 
 after(async () => {
-  await prisma?.$disconnect().catch(() => undefined);
-  rmSync(workdir, { recursive: true, force: true });
+  if (!prisma) return;
+  await prisma
+    .$executeRawUnsafe(`DROP SCHEMA IF EXISTS "${schemaName}" CASCADE`)
+    .catch(() => undefined);
+  await prisma.$disconnect().catch(() => undefined);
 });
 
 async function addHistory(guildId: string, encoded: string): Promise<void> {
@@ -61,7 +69,7 @@ async function addHistory(guildId: string, encoded: string): Promise<void> {
   });
 }
 
-test("every copy of an unplayable track leaves that guild's history", async () => {
+test("every copy of an unplayable track leaves that guild's history", { skip }, async () => {
   await addHistory("guild-a", "bad-track");
   await addHistory("guild-a", "bad-track");
   await addHistory("guild-a", "good-track");
@@ -79,7 +87,7 @@ test("every copy of an unplayable track leaves that guild's history", async () =
   );
 });
 
-test("another guild's copy of the same track is left alone", async () => {
+test("another guild's copy of the same track is left alone", { skip }, async () => {
   // The same track may play perfectly well on a different server's node.
   await addHistory("guild-b", "shared-track");
   await addHistory("guild-a", "shared-track");
@@ -92,7 +100,7 @@ test("another guild's copy of the same track is left alone", async () => {
   assert.equal(theirs, 1);
 });
 
-test("pruning nothing is not an error", async () => {
+test("pruning nothing is not an error", { skip }, async () => {
   assert.equal(await forgetUnplayable("guild-a", null), 0);
   assert.equal(await forgetUnplayable("guild-a", undefined), 0);
   assert.equal(await forgetUnplayable("guild-a", "never-existed"), 0);

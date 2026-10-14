@@ -1,0 +1,68 @@
+# Production stack for one Tsuki instance.
+#
+#   cp deploy/tsuki.env.example deploy/tsuki.env   # fill it in
+#   docker compose -f deploy/compose.yml up -d --build
+#
+# Nothing here listens on a public interface: the dashboard is published on
+# 127.0.0.1 for a reverse proxy on the host (see deploy/Caddyfile), and the
+# bot's API and PostgreSQL are reachable only inside this compose network.
+name: tsuki
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: tsuki
+      POSTGRES_DB: tsuki
+      POSTGRES_PASSWORD_FILE: /run/secrets/pg_password
+    secrets: [pg_password]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tsuki -d tsuki"]
+      interval: 5s
+      retries: 20
+
+  # Applies pending migrations, then exits. The bot and the dashboard wait for
+  # it, so a deploy never starts code against a schema it does not expect.
+  migrate:
+    build: { context: .., dockerfile: Dockerfile }
+    image: tsuki:latest
+    env_file: tsuki.env
+    working_dir: /app/packages/db
+    command: ["pnpm", "exec", "prisma", "migrate", "deploy"]
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  bot:
+    image: tsuki:latest
+    restart: unless-stopped
+    env_file: tsuki.env
+    environment:
+      # Inside the compose network only; the port is never published.
+      BOT_API_HOST: 0.0.0.0
+    working_dir: /app/apps/bot
+    command: ["node", "src/index.ts"]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+
+  web:
+    image: tsuki:latest
+    restart: unless-stopped
+    env_file: tsuki.env
+    environment:
+      BOT_API_URL: http://bot:3856
+    working_dir: /app/apps/web
+    command: ["pnpm", "exec", "next", "start", "--port", "3860", "--hostname", "0.0.0.0"]
+    ports:
+      - "127.0.0.1:3860:3860"
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+
+secrets:
+  pg_password:
+    file: pg_password.txt
+
+volumes:
+  pgdata:

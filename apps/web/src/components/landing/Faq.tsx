@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import styles from "./landing.module.css";
+import { Minus, Plus } from "lucide-react";
 
 export interface FaqEntry {
   q: string;
@@ -27,7 +28,11 @@ export function Faq({ items }: { items: FaqEntry[] }) {
             >
               {item.q}
               <span className={styles.faqSign} aria-hidden="true">
-                {isOpen ? "−" : "+"}
+                {isOpen ? (
+                  <Minus size={16} strokeWidth={2} />
+                ) : (
+                  <Plus size={16} strokeWidth={2} />
+                )}
               </span>
             </button>
             <div

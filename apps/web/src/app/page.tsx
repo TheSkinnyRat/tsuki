@@ -1,5 +1,15 @@
 import { auth, signIn } from "@/auth.ts";
 import { redirect } from "next/navigation";
+import {
+  Infinity as InfinityIcon,
+  LayoutGrid,
+  MonitorPlay,
+  ScanSearch,
+  Server,
+  ShieldCheck,
+  TriangleAlert,
+  type LucideIcon,
+} from "lucide-react";
 import type { CSSProperties } from "react";
 import { Faq, type FaqEntry } from "@/components/landing/Faq.tsx";
 import { MotionToggle } from "@/components/landing/MotionToggle.tsx";
@@ -38,7 +48,8 @@ export default async function LandingPage() {
       <header className={styles.header}>
         <div className={`${styles.wrap} ${styles.headerRow}`}>
           <a href="#top" className={styles.brand}>
-            <span className={styles.mark} />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/tsuki.svg" alt="" className={styles.mark} />
             <span className={styles.brandName}>tsuki</span>
           </a>
           <nav className={styles.nav}>
@@ -60,13 +71,16 @@ export default async function LandingPage() {
       </header>
 
       <section id="top" className={`${styles.hero} ${styles.motionSection}`}>
-        <Ambient />
         <MotionToggle />
         <div className={`${styles.wrap} ${styles.heroGrid} ${styles.content}`}>
           <div>
-            <div className={styles.badge}>
-              <span className={styles.dot} />
-              In development — bring your own Lavalink node
+            <div className={styles.devAlert} role="note">
+              <TriangleAlert size={16} strokeWidth={2} className={styles.devAlertIcon} aria-hidden />
+              <p>
+                <strong>Tsuki is still in development.</strong> Things may change
+                or break without notice, and the bot stays silent in a server
+                until that server adds its own Lavalink node.
+              </p>
             </div>
             <h1 className={styles.h1}>
               Music for your server,
@@ -127,7 +141,7 @@ export default async function LandingPage() {
           <div className={`${styles.cardGrid} ${styles.features}`}>
             {FEATURES.map((feature) => (
               <div key={feature.title} className={styles.feature}>
-                <div className={styles.glyph} style={feature.glyph} />
+                <feature.icon className={styles.glyph} size={24} strokeWidth={1.75} aria-hidden />
                 <h3 className={styles.h3}>{feature.title}</h3>
                 <p className={styles.body}>{feature.body}</p>
               </div>
@@ -330,7 +344,8 @@ export default async function LandingPage() {
       <footer>
         <div className={`${styles.wrap} ${styles.footerRow}`}>
           <div className={styles.footerBrand}>
-            <span className={`${styles.mark} ${styles.markSmall}`} />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/tsuki.svg" alt="" className={`${styles.mark} ${styles.markSmall}`} />
             <span>© 2026 Tsuki · AGPL-3.0</span>
           </div>
           <div className={styles.footerLinks}>
@@ -357,32 +372,6 @@ export default async function LandingPage() {
           </form>
         ) : null}
       </footer>
-    </div>
-  );
-}
-
-function Ambient() {
-  return (
-    <div className={styles.ambient} aria-hidden="true">
-      <div className={styles.orbitField}>
-        <span className={styles.orbit} />
-        <span className={styles.orbit} />
-        <span className={styles.orbit} />
-      </div>
-      {STARS.map(([x, y, cross], i) => (
-        <span
-          key={i}
-          className={cross ? `${styles.star} ${styles.starCross}` : styles.star}
-          style={
-            {
-              "--x": `${x}%`,
-              "--y": `${y}%`,
-              "--duration": `${6 + (i % 5)}s`,
-              "--delay": `${-0.7 * i}s`,
-            } as CSSProperties
-          }
-        />
-      ))}
     </div>
   );
 }
@@ -459,24 +448,6 @@ function Ticks({ items }: { items: React.ReactNode[] }) {
   );
 }
 
-/** [x %, y %, cross-shaped] — the design's star field, in its order. */
-const STARS: [number, number, boolean][] = [
-  [6, 19, true],
-  [19, 9, false],
-  [37, 15, false],
-  [55, 10, false],
-  [69, 13, true],
-  [88, 17, false],
-  [95, 36, false],
-  [91, 72, false],
-  [80, 88, true],
-  [58, 84, false],
-  [33, 91, false],
-  [8, 78, false],
-  [47, 47, true],
-  [64, 64, false],
-];
-
 const STATS = [
   { value: "Lavalink v4", label: "the audio node your server brings" },
   { value: "22", label: "slash commands, all on the dashboard" },
@@ -484,36 +455,36 @@ const STATS = [
   { value: "0", label: "audio streams through the dashboard" },
 ];
 
-const FEATURES: { title: string; body: string; glyph: CSSProperties }[] = [
+const FEATURES: { title: string; body: string; icon: LucideIcon }[] = [
   {
     title: "Control from the web",
     body: "Play, skip, reorder and seek from a browser tab. Slash commands stay available — they just stop being mandatory.",
-    glyph: { borderRadius: 7 },
+    icon: MonitorPlay,
   },
   {
     title: "Bring your own node",
     body: "Each server stores its own Lavalink v4 credentials, can keep several nodes, and fails over between them.",
-    glyph: { borderRadius: "50%" },
+    icon: Server,
   },
   {
     title: "Honest capabilities",
     body: "Tsuki reads the node's /v4/info and shows its sources, plugins and filters. A source the node lacks is refused up front, with a reason.",
-    glyph: { transform: "rotate(45deg)" },
+    icon: ScanSearch,
   },
   {
     title: "Multi-server dashboard",
     body: "One Discord login, every server you share with Tsuki. Pick a server and its queue, playlists and effects are right there.",
-    glyph: { borderRadius: "7px 7px 7px 0" },
+    icon: LayoutGrid,
   },
   {
     title: "Stay in voice & autoplay",
     body: "Keep Tsuki in the channel when it empties, and keep playing from this server's own history when the queue runs dry.",
-    glyph: { borderRadius: "50% 7px 50% 7px" },
+    icon: InfinityIcon,
   },
   {
     title: "Roles & DJ rules",
     body: "Require a DJ role, and decide per channel whether requests are allowed, DJ-only, or locked. One permission check covers both surfaces.",
-    glyph: { borderRadius: 3 },
+    icon: ShieldCheck,
   },
 ];
 

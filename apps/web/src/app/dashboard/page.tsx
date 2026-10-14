@@ -2,6 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth.ts";
 import { bot } from "@/lib/bot.ts";
+import { LogOut } from "lucide-react";
+import { signOutAction } from "@/app/actions.ts";
 
 export default async function GuildPicker() {
   const session = await auth();
@@ -14,7 +16,18 @@ export default async function GuildPicker() {
 
   return (
     <main className="mx-auto max-w-2xl px-4 py-16">
-      <h1 className="text-2xl font-medium">Your servers</h1>
+      <div className="flex items-center justify-between gap-4">
+        <h1 className="text-2xl font-medium">Your servers</h1>
+        <form action={signOutAction}>
+          <button
+            type="submit"
+            className="flex h-[30px] cursor-pointer items-center gap-1.5 rounded-lg border border-[var(--color-line)] bg-transparent px-[11px] text-[12.5px] text-[var(--color-muted)] transition-colors duration-150 hover:border-[var(--color-halo)] hover:text-[var(--color-ink)]"
+          >
+            <LogOut size={13} strokeWidth={2} aria-hidden />
+            Sign out
+          </button>
+        </form>
+      </div>
       <p className="mt-2 text-sm text-[var(--color-muted)]">
         Servers you and Tsuki are both in.
       </p>

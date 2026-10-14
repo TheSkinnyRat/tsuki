@@ -1,6 +1,7 @@
 "use client";
 
 import type { PlayerSnapshot } from "@tsuki/shared";
+import { Pause, Play, Repeat, Repeat1, Shuffle, SkipBack, SkipForward } from "lucide-react";
 import { api, formatDuration } from "@/lib/api.ts";
 import { Artwork } from "./ui.tsx";
 
@@ -82,32 +83,37 @@ export function PlayerBar({
                 onAct(() => api.post(guildId, "shuffle"), "Queue shuffled.")
               }
             >
-              ⤮
+              <Shuffle size={15} strokeWidth={2} aria-hidden />
             </IconButton>
             <TransportButton
               title="Previous"
               disabled={!current}
               onClick={() => onAct(() => api.post(guildId, "previous"))}
             >
-              ◀◀
+              <SkipBack size={16} strokeWidth={2} fill="currentColor" aria-hidden />
             </TransportButton>
             <button
               type="button"
-              title="Play / pause"
+              title={playing ? "Pause" : "Play"}
+              aria-label={playing ? "Pause" : "Play"}
               disabled={!current}
               onClick={() =>
                 onAct(() => api.post(guildId, playing ? "pause" : "resume"))
               }
               className="grid size-[38px] cursor-pointer place-items-center rounded-full border-0 bg-[var(--color-accent)] font-[family-name:var(--font-mono)] text-xs text-[var(--color-on-accent)] transition-opacity duration-150 hover:opacity-[0.88] disabled:cursor-default disabled:opacity-40"
             >
-              {playing ? "❚❚" : "▶"}
+              {playing ? (
+                <Pause size={16} strokeWidth={2} fill="currentColor" aria-hidden />
+              ) : (
+                <Play size={16} strokeWidth={2} fill="currentColor" className="translate-x-px" aria-hidden />
+              )}
             </button>
             <TransportButton
               title="Next"
               disabled={!current}
               onClick={() => onAct(() => api.post(guildId, "skip"))}
             >
-              ▶▶
+              <SkipForward size={16} strokeWidth={2} fill="currentColor" aria-hidden />
             </TransportButton>
             <IconButton
               title={`Loop: ${player?.repeatMode ?? "off"}`}
@@ -117,7 +123,11 @@ export function PlayerBar({
                 onAct(() => api.post(guildId, "repeat", { mode: repeatNext }))
               }
             >
-              ↻
+              {player?.repeatMode === "track" ? (
+                <Repeat1 size={15} strokeWidth={2} aria-hidden />
+              ) : (
+                <Repeat size={15} strokeWidth={2} aria-hidden />
+              )}
             </IconButton>
           </div>
 

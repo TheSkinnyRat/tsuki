@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, formatDuration } from "@/lib/api.ts";
 import { Artwork, Panel, SmallButton } from "./ui.tsx";
+import { X } from "lucide-react";
 
 type Act = (run: () => Promise<unknown>, success?: string) => Promise<void>;
 
@@ -102,9 +103,9 @@ export function PlaylistsPanel({
                   );
                   await load();
                 }}
-                className="size-[22px] flex-none cursor-pointer rounded-md border border-transparent bg-transparent text-[13px] leading-none text-[var(--color-muted)] hover:border-[var(--color-line)] hover:text-[var(--color-ink)]"
+                className="grid size-[22px] flex-none cursor-pointer place-items-center rounded-md border border-transparent bg-transparent text-[13px] leading-none text-[var(--color-muted)] hover:border-[var(--color-line)] hover:text-[var(--color-ink)]"
               >
-                ×
+                <X size={14} strokeWidth={2} aria-hidden />
               </button>
             </div>
           ))

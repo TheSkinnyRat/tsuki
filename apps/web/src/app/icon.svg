@@ -1,0 +1,99 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="1024" height="1024" viewBox="0 0 1024 1024">
+  <title>Tsuki — Moon Music Logo</title>
+
+  <defs>
+    <linearGradient id="background" x2="0.3" y2="1">
+      <stop stop-color="#1B2257"/>
+      <stop offset="0.55" stop-color="#101536"/>
+      <stop offset="1" stop-color="#10143B"/>
+    </linearGradient>
+
+    <linearGradient id="moon" gradientUnits="userSpaceOnUse"
+                    x1="340" y1="245" x2="655" y2="815">
+      <stop stop-color="#FFFEEC"/>
+      <stop offset="0.35" stop-color="#FFF1ED"/>
+      <stop offset="0.7" stop-color="#D1CCFF"/>
+      <stop offset="1" stop-color="#97A8FF"/>
+    </linearGradient>
+
+    <linearGradient id="moonLight" gradientUnits="userSpaceOnUse"
+                    x1="425" y1="250" x2="610" y2="790">
+      <stop stop-color="#FFFFEE"/>
+      <stop offset="0.48" stop-color="#FFF5EF"/>
+      <stop offset="1" stop-color="#E3DCFF"/>
+    </linearGradient>
+
+    <linearGradient id="note" gradientUnits="userSpaceOnUse"
+                    x1="540" y1="385" x2="716" y2="654">
+      <stop stop-color="#F5EDFF"/>
+      <stop offset="0.5" stop-color="#BBC0FF"/>
+      <stop offset="1" stop-color="#91A3FF"/>
+    </linearGradient>
+
+    <linearGradient id="stars" x2="0.7" y2="1">
+      <stop stop-color="#FFF4FF"/>
+      <stop offset="1" stop-color="#BBC5FF"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Rounded app background -->
+  <rect width="1024" height="1024" rx="210"
+        fill="url(#background)"/>
+
+  <g transform="translate(-219 -220) scale(1.165)">
+    <!-- Crescent silhouette -->
+    <path fill="url(#moon)" d="
+      M 670 305
+      C 509 295 351 401 314 546
+      C 269 713 382 898 552 938
+      C 723 980 879 883 943 735
+      C 852 823 744 849 643 813
+      C 538 776 464 688 459 574
+      C 451 453 533 343 670 305 Z"/>
+
+    <!-- Soft inner crescent face -->
+    <path fill="url(#moonLight)" d="
+      M 670 305
+      C 550 303 424 396 379 506
+      C 334 618 375 735 474 806
+      C 614 908 806 871 943 735
+      C 852 823 744 849 643 813
+      C 538 776 464 688 459 574
+      C 451 453 533 343 670 305 Z"/>
+
+    <!-- Musical note -->
+    <path fill="url(#note)" d="
+      M 731 404
+      C 731 393 741 389 749 398
+      C 768 419 784 432 808 447
+      C 853 475 878 510 875 553
+      C 874 582 862 611 844 631
+      C 838 638 833 634 837 626
+      C 852 597 849 573 833 551
+      C 817 530 783 516 762 498
+      L 762 670
+      C 762 720 726 755 682 760
+      C 641 764 610 740 606 706
+      C 600 670 626 635 660 620
+      C 685 609 710 613 731 624 Z"/>
+
+    <!-- Stars and dots -->
+    <g fill="url(#stars)">
+      <path d="
+        M 574 447
+        C 581 467 582 470 604 479
+        C 583 486 581 490 574 511
+        C 567 490 564 486 544 479
+        C 565 472 568 468 574 447 Z"/>
+      <path d="
+        M 905 644
+        C 910 659 914 663 929 669
+        C 914 674 910 679 905 694
+        C 900 679 896 674 881 669
+        C 896 663 900 659 905 644 Z"/>
+      <circle cx="527" cy="579" r="7.7"/>
+      <circle cx="835" cy="736" r="7.5"/>
+    </g>
+  </g>
+</svg>

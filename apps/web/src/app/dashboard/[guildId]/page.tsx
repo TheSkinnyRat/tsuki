@@ -27,6 +27,7 @@ export default async function GuildDashboard({
       guildIcon={guild.icon}
       guilds={guilds.map(({ id, name, icon }) => ({ id, name, icon }))}
       userImage={session?.user?.image ?? null}
+      userName={session?.user?.name ?? null}
     />
   );
 }

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import styles from "./landing.module.css";
+import { Moon, Sun } from "lucide-react";
 
 type Theme = "light" | "dark";
 
@@ -48,7 +49,11 @@ export function ThemeToggle() {
       aria-label={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
       className={styles.iconButton}
     >
-      {theme === "dark" ? "☀" : "☾"}
+      {theme === "dark" ? (
+        <Sun size={16} strokeWidth={2} aria-hidden />
+      ) : (
+        <Moon size={16} strokeWidth={2} aria-hidden />
+      )}
     </button>
   );
 }

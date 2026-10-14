@@ -11,8 +11,10 @@ import { SettingsPanel } from "./SettingsPanel.tsx";
 import { PlayerBar } from "./PlayerBar.tsx";
 import { EffectsPanel } from "./EffectsPanel.tsx";
 import { PlaylistsPanel } from "./PlaylistsPanel.tsx";
+import { Plus } from "lucide-react";
 import { MoonMark } from "./ui.tsx";
 import { ThemeToggle } from "./ThemeToggle.tsx";
+import { UserMenu } from "./UserMenu.tsx";
 
 /**
  * Polls rather than streams, on purpose for now.
@@ -46,12 +48,14 @@ export function DashboardClient({
   guildIcon,
   guilds,
   userImage,
+  userName,
 }: {
   guildId: string;
   guildName: string;
   guildIcon: string | null;
   guilds: RailGuild[];
   userImage: string | null;
+  userName: string | null;
 }) {
   const [player, setPlayer] = useState<PlayerSnapshot | null>(null);
   const [settings, setSettings] = useState<GuildSettings | null>(null);
@@ -158,16 +162,7 @@ export function DashboardClient({
             <span className="whitespace-nowrap">{channelChip}</span>
           </div>
           <ThemeToggle />
-          {userImage ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={userImage}
-              alt=""
-              className="size-7 rounded-full border border-[var(--color-line)]"
-            />
-          ) : (
-            <span className="hatch-sm size-7 rounded-full border border-[var(--color-line)]" />
-          )}
+          <UserMenu image={userImage} name={userName} />
         </div>
       </header>
 
@@ -196,7 +191,7 @@ export function DashboardClient({
             title="All servers"
             className="grid size-[34px] place-items-center rounded-[10px] border border-dashed border-[var(--color-line)] text-[15px] leading-none text-[var(--color-muted)] hover:border-[var(--color-halo)] hover:text-[var(--color-ink)]"
           >
-            +
+            <Plus size={16} strokeWidth={2} aria-hidden />
           </Link>
         </nav>
 

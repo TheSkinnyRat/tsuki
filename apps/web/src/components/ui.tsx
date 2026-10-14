@@ -2,7 +2,7 @@
 
 /**
  * The small pieces the design repeats: the navy switch, the hatched artwork
- * placeholder, the pill chip and the moon mark. Kept in one file so a spacing
+ * placeholder, the pill chip and the logo mark. Kept in one file so a spacing
  * change lands everywhere at once.
  */
 
@@ -91,9 +91,8 @@ export function Chip({ children }: { children: React.ReactNode }) {
 
 export function MoonMark() {
   return (
-    <span className="relative block size-[18px] overflow-hidden rounded-full bg-[var(--color-accent)]">
-      <span className="absolute -top-[5px] left-[5px] block size-[18px] rounded-full bg-[var(--color-bg)]" />
-    </span>
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src="/tsuki.svg" alt="" className="block size-[22px] flex-none" />
   );
 }
 

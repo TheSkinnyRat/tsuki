@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Moon, Sun } from "lucide-react";
 
 const KEY = "tsuki-theme";
 
@@ -44,7 +45,11 @@ export function ThemeToggle() {
       aria-label="Toggle theme"
       className="grid size-[30px] cursor-pointer place-items-center rounded-lg border border-[var(--color-line)] bg-transparent font-[family-name:var(--font-mono)] text-xs text-[var(--color-muted)] transition-colors duration-150 hover:border-[var(--color-halo)] hover:text-[var(--color-ink)]"
     >
-      {theme === "dark" ? "☀" : "☾"}
+      {theme === "dark" ? (
+        <Sun size={15} strokeWidth={2} aria-hidden />
+      ) : (
+        <Moon size={15} strokeWidth={2} aria-hidden />
+      )}
     </button>
   );
 }

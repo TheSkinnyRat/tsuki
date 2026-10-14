@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { NodeSummary, PlayerSnapshot } from "@tsuki/shared";
 import { api, formatDuration } from "@/lib/api.ts";
 import { Panel, SmallButton } from "./ui.tsx";
+import { AudioLines, X } from "lucide-react";
 
 type Act = (run: () => Promise<unknown>, success?: string) => Promise<void>;
 
@@ -92,7 +93,11 @@ export function QueuePanel({
                       : "text-[var(--color-muted)]"
                   }`}
                 >
-                  {isCurrent ? "▶" : String(index + 2).padStart(2, "0")}
+                  {isCurrent ? (
+                    <AudioLines size={13} strokeWidth={2} aria-label="Now playing" />
+                  ) : (
+                    String(index + 2).padStart(2, "0")
+                  )}
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[13px]">
@@ -123,9 +128,9 @@ export function QueuePanel({
                       isCurrent ? "Skipped." : "Removed.",
                     )
                   }
-                  className="size-[22px] flex-none cursor-pointer rounded-md border border-transparent bg-transparent text-[13px] leading-none text-[var(--color-muted)] hover:border-[var(--color-line)] hover:text-[var(--color-ink)]"
+                  className="grid size-[22px] flex-none cursor-pointer place-items-center rounded-md border border-transparent bg-transparent text-[13px] leading-none text-[var(--color-muted)] hover:border-[var(--color-line)] hover:text-[var(--color-ink)]"
                 >
-                  ×
+                  <X size={14} strokeWidth={2} aria-hidden />
                 </button>
               </div>
             );

@@ -1,5 +1,6 @@
 "use client";
 
+import { Pause, Play } from "lucide-react";
 import { useState } from "react";
 import styles from "./landing.module.css";
 
@@ -23,7 +24,12 @@ export function MotionToggle() {
       aria-label="Pause ambient animation"
       aria-pressed={paused}
     >
-      {paused ? "▶ Motion paused" : "Ⅱ Pause motion"}
+      {paused ? (
+        <Play size={11} strokeWidth={2.25} aria-hidden />
+      ) : (
+        <Pause size={11} strokeWidth={2.25} aria-hidden />
+      )}
+      {paused ? "Motion paused" : "Pause motion"}
     </button>
   );
 }

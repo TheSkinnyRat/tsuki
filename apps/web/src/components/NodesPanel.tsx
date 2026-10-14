@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { NodeSummary } from "@tsuki/shared";
 import { api } from "@/lib/api.ts";
 import { Panel, PanelHeader, SmallButton, Switch } from "./ui.tsx";
+import { X } from "lucide-react";
 
 type Act = (run: () => Promise<unknown>, success?: string) => Promise<void>;
 
@@ -120,9 +121,9 @@ export function NodesPanel({
                             "Node removed.",
                           )
                         }
-                        className="size-[22px] flex-none cursor-pointer rounded-md border border-transparent bg-transparent text-[13px] leading-none text-[var(--color-muted)] hover:border-[var(--color-line)] hover:text-[var(--color-ink)]"
+                        className="grid size-[22px] flex-none cursor-pointer place-items-center rounded-md border border-transparent bg-transparent text-[13px] leading-none text-[var(--color-muted)] hover:border-[var(--color-line)] hover:text-[var(--color-ink)]"
                       >
-                        ×
+                        <X size={14} strokeWidth={2} aria-hidden />
                       </button>
                     </>
                   )}

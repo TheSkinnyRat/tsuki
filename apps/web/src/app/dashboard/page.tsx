@@ -2,7 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth.ts";
 import { guildsForSession } from "@/lib/session-guilds.ts";
-import { LogOut } from "lucide-react";
+import { LogOut, Plus } from "lucide-react";
+import { inviteUrl } from "@/lib/invite.ts";
 import { signOutAction } from "@/app/actions.ts";
 
 export default async function GuildPicker() {
@@ -11,6 +12,7 @@ export default async function GuildPicker() {
   if (!userId) redirect("/");
 
   const guilds = await guildsForSession(session);
+  const invite = inviteUrl(process.env["DISCORD_CLIENT_ID"]);
 
   return (
     <main className="mx-auto max-w-2xl px-4 py-16">
@@ -31,10 +33,21 @@ export default async function GuildPicker() {
       </p>
 
       {guilds.length === 0 ? (
-        <p className="mt-8 rounded-lg border border-[var(--color-line)] bg-[var(--color-surface)] p-4 text-sm text-[var(--color-muted)]">
-          Tsuki is not in any server you belong to yet. Invite it to one you
-          run, then come back.
-        </p>
+        <div className="mt-8 rounded-lg border border-[var(--color-line)] bg-[var(--color-surface)] p-4 text-sm text-[var(--color-muted)]">
+          <p className="m-0">
+            Tsuki is not in any server you belong to yet. Invite it to one you
+            run, then come back.
+          </p>
+          {invite ? (
+            <a
+              href={invite}
+              className="mt-3 inline-flex h-[30px] items-center gap-1.5 rounded-lg bg-[var(--color-accent)] px-3 text-[12.5px] font-medium text-[var(--color-on-accent)] transition-opacity duration-150 hover:opacity-90"
+            >
+              <Plus size={13} strokeWidth={2.25} aria-hidden />
+              Add to Discord
+            </a>
+          ) : null}
+        </div>
       ) : (
         <ul className="mt-8 grid gap-2">
           {guilds.map((guild) => (

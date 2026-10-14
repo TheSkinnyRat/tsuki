@@ -173,6 +173,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 8px;
   height: 42px;
   padding: 0 20px;
   border-radius: 10px;
@@ -392,6 +393,20 @@
   color: var(--muted);
   max-width: 460px;
   text-wrap: pretty;
+}
+
+.heroLink {
+  display: inline-block;
+  margin-top: 14px;
+  font-size: 13.5px;
+  color: var(--muted);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transition: color 150ms;
+}
+
+.heroLink:hover {
+  color: var(--ink);
 }
 
 .heroNote {

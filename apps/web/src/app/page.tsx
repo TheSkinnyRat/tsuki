@@ -6,6 +6,7 @@ import {
   MonitorPlay,
   ScanSearch,
   Server,
+  Plus,
   ShieldCheck,
   TriangleAlert,
   type LucideIcon,
@@ -18,6 +19,7 @@ import {
   themeBootScript,
 } from "@/components/landing/ThemeToggle.tsx";
 import styles from "@/components/landing/landing.module.css";
+import { inviteUrl } from "@/lib/invite.ts";
 
 const SOURCE_URL = "https://github.com/TheSkinnyRat/tsuki";
 
@@ -37,6 +39,8 @@ async function signInForDev(formData: FormData) {
 export default async function LandingPage() {
   const session = await auth();
   if (session?.user) redirect("/dashboard");
+
+  const invite = inviteUrl(process.env["DISCORD_CLIENT_ID"]);
 
   const devLoginEnabled =
     process.env.NODE_ENV !== "production" && Boolean(process.env["DEV_LOGIN"]);
@@ -93,15 +97,24 @@ export default async function LandingPage() {
               sound stays in the voice channel.
             </p>
             <div className={styles.btnRow}>
+              {invite ? (
+                <a href={invite} className={styles.btn}>
+                  <Plus size={16} strokeWidth={2.25} aria-hidden />
+                  Add to Discord
+                </a>
+              ) : null}
               <form action={signInWithDiscord}>
-                <button type="submit" className={styles.btn}>
+                <button
+                  type="submit"
+                  className={invite ? styles.btnGhost : styles.btn}
+                >
                   Sign in with Discord
                 </button>
               </form>
-              <a href="#how" className={styles.btnGhost}>
-                See how it works
-              </a>
             </div>
+            <a href="#how" className={styles.heroLink}>
+              See how it works
+            </a>
             <p className={styles.heroNote}>
               Open source · no billing · audio stays in Discord
             </p>

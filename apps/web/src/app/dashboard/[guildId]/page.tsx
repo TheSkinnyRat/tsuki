@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth.ts";
 import { bot } from "@/lib/bot.ts";
+import { guildsForSession } from "@/lib/session-guilds.ts";
 import { DashboardClient } from "@/components/DashboardClient.tsx";
 
 export default async function GuildDashboard({
@@ -13,12 +14,23 @@ export default async function GuildDashboard({
   if (!userId) redirect("/");
 
   const { guildId } = await params;
-  const guilds = await bot.guildsFor(userId).catch(() => []);
-  const guild = guilds.find((candidate) => candidate.id === guildId);
+  const guilds = await guildsForSession(session);
+  let guild = guilds.find((candidate) => candidate.id === guildId);
 
-  // Membership is checked again on the bot's side for every action; this only
-  // decides whether the page is worth rendering.
-  if (!guild) notFound();
+  // Not in the list: ask the bot about this one server before giving up, so a
+  // list that is a few seconds stale cannot hide a server the member just
+  // joined. Every action is authorised again on the bot's side regardless.
+  if (!guild) {
+    const membership = await bot
+      .membership(guildId, userId)
+      .catch(() => ({ member: false, canManage: false }));
+    const known = membership.member
+      ? (await bot.botGuilds().catch(() => [])).find((g) => g.id === guildId)
+      : undefined;
+    if (!known) notFound();
+    guild = { ...known, canManage: membership.canManage };
+    guilds.unshift(guild);
+  }
 
   return (
     <DashboardClient

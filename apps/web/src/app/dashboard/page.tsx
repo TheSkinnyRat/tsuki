@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth.ts";
-import { bot } from "@/lib/bot.ts";
+import { guildsForSession } from "@/lib/session-guilds.ts";
 import { LogOut } from "lucide-react";
 import { signOutAction } from "@/app/actions.ts";
 
@@ -10,9 +10,7 @@ export default async function GuildPicker() {
   const userId = (session?.user as { id?: string } | undefined)?.id;
   if (!userId) redirect("/");
 
-  // Asked of the bot: it knows which servers it is actually in, which is the
-  // set that matters here. Discord's OAuth guild list does not.
-  const guilds = await bot.guildsFor(userId).catch(() => []);
+  const guilds = await guildsForSession(session);
 
   return (
     <main className="mx-auto max-w-2xl px-4 py-16">

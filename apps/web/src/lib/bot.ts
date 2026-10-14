@@ -63,6 +63,16 @@ export const bot = {
       Array<{ id: string; name: string; icon: string | null; canManage: boolean }>
     >(`/api/members/${userId}/guilds`),
 
+  botGuilds: () =>
+    call<Array<{ id: string; name: string; icon: string | null }>>(
+      "/api/bot-guilds",
+    ),
+
+  membership: (guildId: string, userId: string) =>
+    call<{ member: boolean; canManage: boolean }>(
+      `/api/guilds/${guildId}/membership/${userId}`,
+    ),
+
   player: (guildId: string) =>
     call<PlayerSnapshot>(`/api/guilds/${guildId}/player`),
 

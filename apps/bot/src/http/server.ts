@@ -96,6 +96,21 @@ export function createApi(deps: ApiDeps): Hono {
     return c.json(out);
   });
 
+  /**
+   * Every server Tsuki is in, straight from the gateway cache — no Discord
+   * call. The dashboard intersects this with the member's own OAuth guild
+   * list, which is how the picker avoids asking about all of them one by one.
+   */
+  app.get("/api/bot-guilds", (c) =>
+    c.json(
+      [...deps.client.guilds.cache.values()].map((g) => ({
+        id: g.id,
+        name: g.name,
+        icon: g.icon,
+      })),
+    ),
+  );
+
   const guild = app.basePath("/api/guilds/:guildId");
 
   async function actorOf(c: {
@@ -108,6 +123,22 @@ export function createApi(deps: ApiDeps): Hono {
   }
 
   // ------------------------------------------------------------- reading
+
+  // One member, one server: whether the dashboard page for it may render.
+  // At most one Discord call, where the old picker route made one per server.
+  guild.get("/membership/:userId", async (c) => {
+    const target = deps.client.guilds.cache.get(c.req.param("guildId")!);
+    if (!target) return c.json({ member: false, canManage: false });
+    const member = await target.members
+      .fetch(c.req.param("userId")!)
+      .catch(() => null);
+    return c.json({
+      member: Boolean(member),
+      canManage: Boolean(
+        member?.permissions.has(PermissionsBitField.Flags.ManageGuild),
+      ),
+    });
+  });
 
   guild.get("/player", async (c) => {
     const guildId = c.req.param("guildId")!;

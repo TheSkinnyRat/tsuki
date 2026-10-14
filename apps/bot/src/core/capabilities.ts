@@ -201,6 +201,12 @@ export const CAPABILITIES: Capability[] = [
     web: { method: "PATCH", path: "/settings" },
   },
   {
+    id: "membership",
+    discord: null,
+    web: { method: "GET", path: "/membership/:userId" },
+    why: "a slash command already runs inside the server it is about",
+  },
+  {
     id: "list-roles",
     discord: null,
     web: { method: "GET", path: "/roles" },

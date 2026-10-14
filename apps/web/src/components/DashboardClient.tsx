@@ -175,13 +175,22 @@ export function DashboardClient({
                 key={guild.id}
                 href={`/dashboard/${guild.id}`}
                 title={guild.name}
-                className={`grid size-[34px] place-items-center border text-[13px] transition-[border-radius] duration-200 ${
+                className={`grid size-[34px] place-items-center overflow-hidden border text-[13px] transition-[border-radius] duration-200 ${
                   selected
                     ? "rounded-[11px] border-[var(--color-accent)] bg-[var(--color-accent)] text-[var(--color-on-accent)]"
                     : "rounded-full border-[var(--color-line)] bg-transparent text-[var(--color-muted)]"
                 }`}
               >
-                {guild.name.slice(0, 1).toUpperCase()}
+                {guild.icon ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={`https://cdn.discordapp.com/icons/${guild.id}/${guild.icon}.png?size=64`}
+                    alt=""
+                    className="size-full rounded-[inherit] object-cover"
+                  />
+                ) : (
+                  guild.name.slice(0, 1).toUpperCase()
+                )}
               </Link>
             );
           })}

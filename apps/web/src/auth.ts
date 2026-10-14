@@ -51,6 +51,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       // secrets, and an eager read turns a missing one into a compile failure.
       clientId: process.env["DISCORD_CLIENT_ID"] ?? "",
       clientSecret: process.env["DISCORD_CLIENT_SECRET"] ?? "",
+      // Discord now returns `iss=https://discord.com` on the callback (RFC 9207),
+      // and Auth.js checks it against the provider's issuer — which defaults to
+      // "https://authjs.dev". Without this every sign-in ends in "Configuration".
+      issuer: "https://discord.com",
       authorization: { params: { scope: "identify guilds" } },
     }),
   ],
